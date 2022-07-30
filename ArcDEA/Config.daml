@@ -1,43 +1,35 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
-<ArcGIS defaultAssembly="ArcDEA.dll"
-        defaultNamespace="ArcDEA"
-        xmlns="http://schemas.esri.com/DADF/Registry"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://schemas.esri.com/DADF/Registry file:///C:/Program%20Files/ArcGIS/Pro/bin/ArcGIS.Desktop.Framework.xsd">
-
+﻿<ArcGIS defaultAssembly="ArcDEA.dll" defaultNamespace="ArcDEA" xmlns="http://schemas.esri.com/DADF/Registry" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schemas.esri.com/DADF/Registry file:///C:/Program%20Files/ArcGIS/Pro/bin/ArcGIS.Desktop.Framework.xsd">
   <AddInInfo id="{2a4ff8b3-aace-43a7-a56d-a4c0cb8414b1}" version="1.0" desktopVersion="3.0.36056">
-    <Name>ArcDEA</Name>   
-    <Description>ArcDEA description</Description>
-    <Image>Images\AddinDesktop32.png</Image>
-    <Author>262272G</Author>
+    <Name>ArcDEA</Name>
+    <Description>ArcDEA is a lightweight plugin for browsing and accessing public satellite data.</Description>
+    <Image>Images\AddinDesktopDEA32.png</Image>
+    <Author>Lewis Trotter</Author>
     <Company>Curtin University</Company>
     <Date>7/29/2022 5:38:14 PM</Date>
     <Subject>Framework</Subject>
-    <!-- Note subject can be one or more of these topics:
-                    Content, Framework, Editing, Geodatabase, Geometry, Geoprocessing, Layouts, Map Authoring, Map Exploration -->
   </AddInInfo>
-
+  
   <modules>
     <insertModule id="ArcDEA_Module" className="Module1" autoLoad="false" caption="Module1">
-      <!-- uncomment to have the control hosted on a separate tab-->
       <tabs>
-        <!--<tab id="ArcDEA_Tab1" caption="New Tab">
-          <group refID="ArcDEA_Group1"/>
-        </tab>-->
+        <tab id="ArcDEA_Tab1" caption="ArcDEA">
+          <group refID="ArcDEA_Group1" />
+        </tab>
       </tabs>
-              
+      
       <groups>
-        <!-- comment this out if you have no controls on the Addin tab to avoid
-              an empty group-->
-        <group id="ArcDEA_Group1" caption="Group 1" appearsOnAddInTab="true">
+        <group id="ArcDEA_Group1" caption="Group 1" appearsOnAddInTab="false">
           <!-- host controls within groups -->
+          <button refID="ArcDEA_Working" size="large" />
         </group>
       </groups>
       
       <controls>
-        <!-- add your controls here -->
-      </controls> 
-      
+        <button id="ArcDEA_Working" caption="Working" className="Working" loadOnClick="true" smallImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/GenericButtonBlue16.png" largeImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/GenericButtonBlue32.png">
+          <tooltip heading="Tooltip Heading">Tooltip text<disabledText /></tooltip>
+        </button>
+      </controls>
+    
     </insertModule>
   </modules>
 </ArcGIS>

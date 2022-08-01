@@ -21,6 +21,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Windows.Media.Imaging;
 
 namespace ArcDEA
 {
@@ -28,76 +29,43 @@ namespace ArcDEA
     {
         protected override async void OnClick()
         {
-            //await QueuedTask.Run(() =>
-            //{
-                // Get raster path and filename and convert to URI
-                //string file = @"C:\Users\262272G\Desktop";
+            // QueuedTask.Run (() => {}); is used to run something in background to kepe UI responsive
+            // For above, prepend await to ensure a QueuedTask finished before moving to next function
+            // When you use await, you need to use the async modifier in function defitinition
 
-                // Create a FileSystemConnectionPath using the folder path.
-                //FileSystemConnectionPath connectionPath = new FileSystemConnectionPath(new System.Uri(file), FileSystemDatastoreType.Raster);
+            // update this to net6 https://www.hanselman.com/blog/parallelforeachasync-in-net-6
 
-                // Create a new FileSystemDatastore using the FileSystemConnectionPath.
-                //FileSystemDatastore dataStore = new FileSystemDatastore(connectionPath);
 
-                // Open the raster dataset.
-                //RasterDataset fileRasterDataset = dataStore.OpenDataset<RasterDataset>("my_tif.tif");
+            // // // //
+            // Setup globals
+            // // // //
 
-                // Get the RasterDatasetDefinition from the raster dataset.
-                //RasterDatasetDefinition rasterDatasetDefinition = fileRasterDataset.GetDefinition();
+            string outFolder = Path.GetTempPath();
+            string maskFolder = Path.Join(outFolder, Guid.NewGuid().ToString());
 
-            //    // Get the number of bands from the raster band definition.
-            //    int bandCount = rasterDatasetDefinition.GetBandCount();
+            Directory.CreateDirectory(maskFolder);
 
-            //    // Get a RasterBand from the raster dataset.
-            //    RasterBand rasterBand = fileRasterDataset.GetBand(6);
-
-            //    // Get the RasterBandDefinition from the raster band.
-            //    RasterBandDefinition rasterBandDefinition = rasterBand.GetDefinition();
-
-            //    // Get the name of the raster band from the raster band.
-            //    string bandName = rasterBandDefinition.GetName();
-
-            //    // Create a full raster from the raster dataset.
-            //    Raster raster = fileRasterDataset.CreateFullRaster();
-
-            //    // Calculate size of pixel block to create
-            //    int pixelBlockHeight = raster.GetHeight();
-            //    int pixelBlockWidth = raster.GetWidth();
-
-            //    // Create a new (blank) pixel block.
-            //    PixelBlock currentPixelBlock = raster.CreatePixelBlock(pixelBlockWidth, pixelBlockHeight);
-
-            //    // Read pixel values from the raster dataset into the pixel block starting from the given top left corner.
-            //    raster.Read(0, 0, currentPixelBlock);
-
-            //    // create a container to hold the pixel values
-            //    Array pixelArray = new object[currentPixelBlock.GetWidth(), currentPixelBlock.GetHeight()];
-
-            //    // retrieve the actual pixel values from the pixelblock representing the red raster band
-            //    pixelArray = currentPixelBlock.GetPixelData(6, false);
-            //});
+            string url = "https://explorer.sandbox.dea.ga.gov.au/stac/search?collection=ga_ls8c_ard_3&time=2014-01-01/2014-12-13&bbox=[119.7269,-22.9444,121.1253,-21.9084]&limit=500";
 
 
             // // // //
             // Get available dates for current bbox
             // // // //
 
-            // Set url.
-            string url = "https://explorer.sandbox.dea.ga.gov.au/stac/search?collection=ga_ls8c_ard_3&time=2013-01-01/2015-12-13&bbox=[118.9665,-22.7786,119.1555,-22.6962]&limit=500";
+            JsonElement features = await QueuedTask.Run(() =>
+            {
+                WebRequest req = WebRequest.Create(url);
+                Stream resultStream = req.GetResponse().GetResponseStream();
 
-            // Create a connection to the WMS server
-            //var serverConnection = new CIMInternetServerConnection {URL = url};
-            //var connection = new CIMWMSServiceConnection {ServerConnection = serverConnection};
+                StreamReader resultReader = new StreamReader(resultStream);
+                string output = resultReader.ReadToEnd();
 
-            WebRequest req = WebRequest.Create(url);
-            Stream resultStream = req.GetResponse().GetResponseStream();
+                JsonDocument doc = JsonDocument.Parse(output);
+                JsonElement root = doc.RootElement;
 
-            StreamReader resultReader = new StreamReader(resultStream);
-            string output = resultReader.ReadToEnd();
-
-            JsonDocument doc = JsonDocument.Parse(output);
-            JsonElement root = doc.RootElement;
-            JsonElement features = root.GetProperty("features");
+                //JsonElement features = root.GetProperty("features");
+                return root.GetProperty("features");
+            });
 
             List<string> dates = new List<string>();
 
@@ -118,16 +86,14 @@ namespace ArcDEA
 
 
             // // // //
-            // Reduce dates to only cloud-free dates
+            // Create list of http wcs requests
             // // // //
 
-            double minPctValid = 0.9;
-            string out_folder = Path.GetTempPath();
-
-            List<string> cleanDates = new List<string>();
-
+            List<List<string>> wcsData = new List<List<string>>();
             foreach (string date in dates)
             {
+                string outFile = "_" + date.Replace("-", "") + ".tif";
+
                 string wcsUrl = "";
                 wcsUrl += "https://ows.dea.ga.gov.au/wcs?service=WCS";
                 wcsUrl += "&VERSION=1.0.0";
@@ -135,97 +101,157 @@ namespace ArcDEA
                 wcsUrl += "&COVERAGE=ga_ls8c_ard_3";
                 wcsUrl += "&TIME=" + date;
                 wcsUrl += "&MEASUREMENTS=oa_fmask";
-                wcsUrl += "&BBOX=-1323766.7364,-2521531.7166,-1305606.1361,-2510422.3795";
+                wcsUrl += "&BBOX=-1244996.6303,-2532323.9596,-1113352.8067,-2404162.9812";
                 wcsUrl += "&CRS=EPSG:3577";
                 wcsUrl += "&RESX=30.0";
                 wcsUrl += "&RESY=30.0";
                 wcsUrl += "&FORMAT=GeoTIFF";
 
-                string out_file = "_" + date.Replace("-", "") + ".tif";  // todo do the image read in memory below to prevent saving to disk
+                wcsData.Add(new List<string> { date, wcsUrl, maskFolder, outFile });
+            };
 
-                using (var client = new WebClient())
+
+            // // // //
+            // Download all fmask tifs to mask folder in temp directory
+            // // // //
+
+            Dictionary<string, string> downloadedMasks = new Dictionary<string, string>();
+
+            var client = new HttpClient();
+
+            async Task DownloadGeoTiffs(List<string> data)
+            {
+                System.Diagnostics.Debug.WriteLine(data[0]);
+
+                string outFile = Path.Join(data[2], data[3]);
+
+                var response = await client.GetAsync(data[1]);
+                HttpContent content = response.Content;
+
+                var stream = await content.ReadAsStreamAsync();
+                var file = new FileStream(outFile, FileMode.CreateNew);
+
+                await stream.CopyToAsync(file);
+
+                downloadedMasks.Add(data[0], data[3]);
+            };
+
+            var tasks = wcsData.Select(e => DownloadGeoTiffs(e)).ToList();
+            await Task.WhenAll(tasks);
+
+
+
+            // // // //
+            // Extract mask values for determine valid, cloud free dates
+            // // // //
+
+            float minPctValid = 0.9F;
+            List<int> validClasses = new List<int> { 1, 4, 5 };
+
+            Uri uri = new Uri(maskFolder);
+
+            List<string> cleanDates = new List<string>();
+            foreach (var item in downloadedMasks)
+            {
+                System.Diagnostics.Debug.WriteLine("Working on mask: " + item.Key);
+
+                await QueuedTask.Run(() =>
                 {
-                    System.Diagnostics.Debug.WriteLine("Downloading: " + Path.Join(out_folder, out_file));
-                    client.DownloadFile(wcsUrl, Path.Join(out_folder, out_file));
-
-                    Uri uri = new Uri(out_folder);
-
                     FileSystemConnectionPath conn = new FileSystemConnectionPath(uri, FileSystemDatastoreType.Raster);
+                    FileSystemDatastore dstore = new FileSystemDatastore(conn);
+                    RasterDataset rasterDataset = dstore.OpenDataset<RasterDataset>(item.Value);
+                    Raster raster = rasterDataset.CreateFullRaster();
 
-                    var pctValid = await QueuedTask.Run(() => {
-                        
-                        FileSystemDatastore dstore = new FileSystemDatastore(conn);
-                        RasterDataset rasterDataset = dstore.OpenDataset<RasterDataset>("_" + date.Replace("-", "") + ".tif");
-                        Raster raster = rasterDataset.CreateFullRaster();
+                    int width = raster.GetWidth();
+                    int height = raster.GetHeight();
 
-                        int width = raster.GetWidth();
-                        int height = raster.GetHeight();
-                        var block = raster.CreatePixelBlock(width, height);
+                    PixelBlock block = raster.CreatePixelBlock(width, height);
+                    raster.Read(0, 0, block);
 
-                        raster.Read(0, 0, block);
+                    Array rawPixelArray = block.GetPixelData(0, false);
 
-                        Array array = block.GetPixelData(0, false);
+                    byte[,] bytesPixelArray2d = (byte[,])rawPixelArray;
+                    byte[] bytesPixelArray1d = new byte[bytesPixelArray2d.Length];
+                    Buffer.BlockCopy(bytesPixelArray2d, 0, bytesPixelArray1d, 0, bytesPixelArray2d.Length);
 
-                        List<int> validClasses = new List<int> { 1, 4, 5 };
-                        int validCount = 0;
+                    long fullSize = bytesPixelArray2d.Length;
+                    long validSize = bytesPixelArray1d.Where(e => validClasses.Contains(e)).ToArray().Length;
 
-                        for (int i = 0; i < width; i++)
-                        {
-                            for (int j = 0; j < height; j++)
-                            {
-                                int pixelValue = Convert.ToInt16(block.GetValue(0, i, j));
-
-                                if (validClasses.Contains(pixelValue))
-                                {
-                                    validCount += 1;
-                                }
-                            }
-                        }
-
-                        return validCount / array.Length;
-                    });
-
-                    if (pctValid > minPctValid)
+                    if (((float)validSize / (float)fullSize) > minPctValid)
                     {
-                        cleanDates.Add(date);
+                        cleanDates.Add(item.Key);
                     }
+                });
+            };
 
-                    File.Delete(out_file);
-                }
-            }
-
-            System.Diagnostics.Debug.WriteLine("Finished getting cloud free dates.");
+            cleanDates.Sort();
 
 
             // // // //
-            // Download cloud-free scenes
+            // Delete all mask files
             // // // //
 
-            out_folder = @"C:\Users\262272G\Desktop\test";
+            // todo
+            //File.Delete(item.Value);
 
+
+            // // // //
+            // Create list of http wcs requests
+            // // // //
+
+            string testingFolder = @"C:\Users\262272G\Desktop\test";
+
+            List<List<string>> wcsCleanData = new List<List<string>>();
             foreach (string date in cleanDates)
             {
+                string outFile = "_" + date.Replace("-", "") + ".tif";
+
                 string wcsUrl = "";
                 wcsUrl += "https://ows.dea.ga.gov.au/wcs?service=WCS";
                 wcsUrl += "&VERSION=1.0.0";
                 wcsUrl += "&REQUEST=GetCoverage";
                 wcsUrl += "&COVERAGE=ga_ls8c_ard_3";
                 wcsUrl += "&TIME=" + date;
-                wcsUrl += "&MEASUREMENTS=nbart_blue,nbart_green,nbart_red,oa_fmask";
-                wcsUrl += "&BBOX=-1323766.7364,-2521531.7166,-1305606.1361,-2510422.3795";
+                wcsUrl += "&MEASUREMENTS=nbart_blue,nbart_green,nbart_red,nbart_nir,oa_fmask";
+                wcsUrl += "&BBOX=-1244996.6303,-2532323.9596,-1113352.8067,-2404162.9812";
                 wcsUrl += "&CRS=EPSG:3577";
                 wcsUrl += "&RESX=30.0";
                 wcsUrl += "&RESY=30.0";
                 wcsUrl += "&FORMAT=GeoTIFF";
 
-                string out_file = "_" + date.Replace("-", "") + ".tif";  // todo do the image read in memory below to prevent saving to disk
+                wcsCleanData.Add(new List<string> { date, wcsUrl, testingFolder, outFile });
+            };
 
-                using (var client = new WebClient())
-                {
-                    System.Diagnostics.Debug.WriteLine("Downloading: " + Path.Join(out_folder, out_file));
-                    client.DownloadFile(wcsUrl, Path.Join(out_folder, out_file));
-                }
-            }
+
+            // // // //
+            // Download all fmask tifs to mask folder in temp directory
+            // // // //
+
+            System.Diagnostics.Debug.WriteLine("Starting downloading of cloud free scenes.");
+
+            //Dictionary<string, string> downloadedScenes = new Dictionary<string, string>();
+
+            async Task DownloadScenes(List<string> data)
+            {
+                System.Diagnostics.Debug.WriteLine(data[0]);
+
+                string outFile = Path.Join(data[2], data[3]);
+
+                var response = await client.GetAsync(data[1]);
+                HttpContent content = response.Content;
+
+                var stream = await content.ReadAsStreamAsync();
+                var file = new FileStream(outFile, FileMode.CreateNew);
+
+                await stream.CopyToAsync(file);
+
+                //downloadedScenes.Add(data[0], data[3]);
+            };
+
+            var tasksClean = wcsCleanData.Select(e => DownloadScenes(e)).ToList();
+            await Task.WhenAll(tasksClean);
+
+            System.Diagnostics.Debug.WriteLine("Process complete.");
         }
     }
 }

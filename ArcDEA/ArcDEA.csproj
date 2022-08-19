@@ -9,6 +9,8 @@
   </PropertyGroup>
   <ItemGroup>
     <None Remove="Images\AddinDesktopDEA32.png" />
+    <None Remove="Images\BrowseFolder16.png" />
+    <None Remove="Images\DrawNewQueryArea16.png" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Config.daml" />    
@@ -16,7 +18,9 @@
     <Content Include="Images\AddInDesktop32.png" />
     <Content Include="DarkImages\AddInDesktop16.png" />
     <Content Include="DarkImages\AddInDesktop32.png" />
-    <Content Include="Images\AddinDesktopDEA32.png" />    
+    <Content Include="Images\AddinDesktopDEA32.png" />
+    <Resource Include="Images\BrowseFolder16.png" />
+    <Resource Include="Images\DrawNewQueryArea16.png" />    
   </ItemGroup>
   <ItemGroup>
     <None Include="Properties\launchSettings.json" />

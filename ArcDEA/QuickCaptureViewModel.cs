@@ -26,11 +26,14 @@ using System.Threading;
 using System.Windows.Threading;
 using System.Net.Http;
 using System.IO;
+using ArcGIS.Core.Data.Raster;
+using System.Collections.Concurrent;
 
 namespace ArcDEA
 {
     internal class QuickCaptureViewModel : DockPane
     {
+
         private const string _dockPaneID = "ArcDEA_QuickCapture";
 
         #region Collections synchronisation
@@ -334,12 +337,13 @@ namespace ArcDEA
         }
         #endregion
 
+        // TODO: Make progress status for percent only, and make a regular text box out of here for messages
         #region Progress controls
         /// <summary>
         /// Current value of progress for incrementing progress bar.
         /// </summary>
-        private double _progressValue = 1;
-        public double ProgressValue
+        private int _progressValue = 1;
+        public int ProgressValue
         {
             get { return _progressValue; }
             set { SetProperty(ref _progressValue, value, () => ProgressValue); }
@@ -364,54 +368,8 @@ namespace ArcDEA
             get { return _progressStatus; }
             set { SetProperty(ref _progressStatus, value, () => ProgressStatus); }
         }
-
-        /// <summary>
-        /// Method to track progress bar.
-        /// </summary>
-        private int _iProgressValue = -1;
-        private int _iMaxProgressValue = -1;
-        private string _iProgressStatus = String.Empty;
-        private void ProgressUpdate(int iProgressValue, int iMaxProgressValue, string iProgressStatus)
-        {
-            if (System.Windows.Application.Current.Dispatcher.CheckAccess())
-            {
-                if (_iMaxProgressValue != iMaxProgressValue)
-                {
-                    MaxProgressValue = iMaxProgressValue;
-                }
-
-                if (_iProgressValue != iProgressValue)
-                {
-                    ProgressValue = iProgressValue;
-                }
-
-                if (_iProgressStatus != iProgressStatus)
-                {
-                    ProgressStatus = iProgressStatus;
-                }
-            }
-            else
-            {
-                ProApp.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, (Action)(() =>
-                {
-                    if (_iMaxProgressValue != iMaxProgressValue)
-                    {
-                        MaxProgressValue = iMaxProgressValue;
-                    }
-
-                    if (_iProgressValue != iProgressValue)
-                    {
-                        ProgressValue = iProgressValue;
-                    }
-
-                    if (_iProgressStatus != iProgressStatus)
-                    {
-                        ProgressStatus = iProgressStatus;
-                    }
-                }));
-            }
-        }
         #endregion
+
 
 
         /// <summary>
@@ -422,113 +380,338 @@ namespace ArcDEA
             get
             {
                 return new RelayCommand(async () =>
-                {
-                    // TODO: checks, etc.
+                {                   
+                    // Reset progressor
+                    ProgressValue = 0;
+                    MaxProgressValue = 100;
+                    IProgress<int> progress = new Progress<int>(e => ProgressValue = e);
 
-                    // Notify progress status
-                    ProgressUpdate(-1, -1, "Initialising...");
-
+                    #region Get and check parameters from UI
                     // Get bounding box of graphic in wgs84 and albers
-                    double[] bboxWgs84 = await Helpers.GraphicToBoundingBoxAsync(SelectedQueryAreaLayer, 4326);
-                    double[] bboxAlbers = await Helpers.GraphicToBoundingBoxAsync(SelectedQueryAreaLayer, 3577);
+                    double[] bboxWgs84;
+                    double[] bboxAlbers;
+                    if (SelectedQueryAreaLayer != null)
+                    {
+                        bboxWgs84 = await Helpers.GraphicToBoundingBoxAsync(SelectedQueryAreaLayer, 4326);
+                        bboxAlbers = await Helpers.GraphicToBoundingBoxAsync(SelectedQueryAreaLayer, 3577);
+                    }
+                    else
+                    {
+                        return;
+                    }
 
                     // Get start and end dates
                     string startDate = QueryStartDate.ToString("yyyy'-'MM'-'dd");
                     string endDate = QueryEndDate.ToString("yyyy'-'MM'-'dd");
 
                     // Get selected collection (as raw collection name)
+                    // TODO: make collection a list
                     string collection = SelectedQueryCollection.RawName;
+                    if (collection == null)
+                    {
+                        return;
+                    }
 
-                    // Get selected assets (as raw band names)
+                    // Get selected asset(s)
                     List<string> assets = QueryAssets.Where(e => e.IsAssetSelected).Select(e => e.RawName).ToList();
-
+                    if (assets.Count == 0)
+                    {
+                        return;
+                    }
 
                     // Setup valid classes and minimum valid pixels
-                    List<int> validClasses = new List<int> { 1, 4, 5 };  // TODO: make dynamic
+                    // TODO: make dynamic add to UI
+                    List<int> validClasses = new List<int> { 1, 4, 5 };  
                     double minValid = 1.0 - (QueryCloudCover / 100);
 
                     // Set user's output folder path
                     string outputFolder = OutputFolderPath;
+                    //if (outputFolder == null || !Directory.Exists(outputFolder))
+                    //{
+                    //return;
+                    //}
+                    #endregion                    
+
+                    #region Construct STAC results and download structure
+                    // Construct STAC url from provided parameters, abort if nothing
+                    // TODO: put this into an iterator for multiple collections
+                    Root root = await QueuedTask.Run(async () =>
+                    {
+                        string url = Data.ConstructStacUrl(collection, startDate, endDate, bboxWgs84, 500);
+                        return await Data.GetStacFromUrlAsync(url);
+                    });
+                    if (root.Features.Count == 0)
+                    {
+                        return;
+                    }
+
+                    // Convert STAC to download structure, sort by datetime, group dates by solar day
+                    var items = Data.ConvertStacToDownloads(root, assets, bboxAlbers);
+                    items = Data.SortByDateTime(items);
+                    items = Data.GroupBySolarDay(items);
+                    #endregion
 
 
+                    // Initialise progressor
+                    ProgressValue = 0;
+                    MaxProgressValue = items.Count;
+                    progress = new Progress<int>(e => ProgressValue = e);
 
-
-                    // Initialize DEA STAC object
-                    Stac stac = new Stac(
-                        collection: collection,
-                        startDate: startDate,
-                        endDate: endDate,
-                        boundingBoxWgs84: bboxWgs84,
-                        boundingBoxAlbers: bboxAlbers,
-                        limit: 250
-                        );
-
-                    // Notify progress status
-                    ProgressUpdate(-1, -1, "Querying STAC endpoint...");
-
-                    // Query STAC endpoint using above parameters
-                    await stac.QueryStacAsync(timeout: 5);
-
-                    // Reduce features down to first date in each solar day group
-                    stac.GroupBySolarDay();
-
-                    // Notify progress status
-                    ProgressUpdate(-1, -1, "Removing invalid items...");
-
-                    // Drop feature dates with too many invalid pixels
-                    await stac.DropInvalidFeaturesAsync(validClasses, minValid);
-
-                    // Convert all STAC items into Wcs urls for download
-                    stac.GetWcs(assets);
+                    #region Download fmask data to temporary folder
+                    // Get the ArcGIS temporary folder path
+                    string tmpFolder = Path.GetTempPath();
 
                     // Open a HTTP client with 60 minute timeout
                     var client = new HttpClient();
                     client.Timeout = TimeSpan.FromMinutes(60);
 
-                    var options = new ParallelOptions { 
-                        MaxDegreeOfParallelism = Environment.ProcessorCount 
+                    // Set up number of cores for download (max available - 1)
+                    var options = new ParallelOptions
+                    {
+                        MaxDegreeOfParallelism = Environment.ProcessorCount
                     };
 
+                    // Download fmask geotiffs to temporary folder
                     int i = 0;
-                    await QueuedTask.Run(() => Parallel.ForEachAsync(stac.Wcs, options, async (item, token) =>
+                    await QueuedTask.Run(() => Parallel.ForEachAsync(items, options, async (item, token) =>
                     {
-                        string date = item.Key;
-                        string url = item.Value[0];
-                        string filename = item.Value[1];
-
                         // Notify
-                        System.Diagnostics.Debug.WriteLine($"Started download: {date}");
+                        System.Diagnostics.Debug.WriteLine($"Started download: {item.Date}");
 
-                        // Create full output folder path
-                        string filepath = Path.Join(outputFolder, filename);
+                        // Create output filename and path for current item
+                        string filepath = Path.Join(tmpFolder, item.MaskFilename);
 
-                        // Query URL and ensure success
-                        var response = await client.GetAsync(url);
+                        // Query WCS mask URL and ensure success
+                        var response = await client.GetAsync(item.MaskWcsUrl);
                         response.EnsureSuccessStatusCode();
 
-                        // Download file to output folder
+                        // Download temporary file to temporary folder
+                        // TODO: make sure access is available
+                        // TODO: make sure file doesnt already exist
                         using (FileStream fs = new FileStream(filepath, FileMode.CreateNew))
                         {
                             await response.Content.CopyToAsync(fs);
                         }
 
                         // Notify
-                        System.Diagnostics.Debug.WriteLine($"Finished download: {date}");
+                        System.Diagnostics.Debug.WriteLine($"Finished download: {item.Date}");
 
                         // Increment progress bar
-                        int pct = Convert.ToInt16(((double)i / (double)stac.Result.Features.Count) * 100);
-                        string msg = $"Downloading items ({pct}%)...";
-                        ProgressUpdate(++i, stac.Result.Features.Count, msg);
+                        i = i + 1;
+                        progress.Report(i);
                     }));
 
-                    // Notify progress status
-                    ProgressUpdate(100, 100, "Finished.");
+                    //TODO: clean up
+                    //
+                    #endregion
+
+                    // Re-initialise progressor
+                    ProgressValue = 0;
+                    MaxProgressValue = items.Count;
+                    progress = new Progress<int>(e => ProgressValue = e);
+
+                    #region Check and remove fmask data for invalid scenes
+                    // Create connection to temporary folder file store
+                    Uri folderUri = new Uri(tmpFolder);
+                    FileSystemConnectionPath conn = new FileSystemConnectionPath(folderUri, FileSystemDatastoreType.Raster);
+
+                    //
+                    i = 0;
+                    await QueuedTask.Run(() => Parallel.ForEachAsync(items, options, async (item, token) =>
+                    {
+                        // Notify
+                        System.Diagnostics.Debug.WriteLine($"Checking mask pixels: {item.Date}");
+
+                        // Open new store
+                        FileSystemDatastore store = new FileSystemDatastore(conn);
+
+                        // Read raster from store
+                        RasterDataset rasterDataset = store.OpenDataset<RasterDataset>(item.MaskFilename);
+                        Raster raster = rasterDataset.CreateFullRaster();
+
+                        // Get a pixel block for quicker reading and read from pixel top left pixel
+                        PixelBlock block = raster.CreatePixelBlock(raster.GetWidth(), raster.GetHeight());
+                        raster.Read(0, 0, block);
+
+                        // Read 2-dimensional pixel values into 1-dimensional byte array
+                        Array pixels2D = block.GetPixelData(0, false);
+                        byte[] pixels1D = new byte[pixels2D.Length];
+                        Buffer.BlockCopy(pixels2D, 0, pixels1D, 0, pixels2D.Length);
+
+                        // Get distinct pixel values and their counts
+                        var counts = pixels1D.GroupBy(e => e).Select(x => new { key = x.Key, val = x.Count() }).ToList();
+
+                        // Get the total of all pixels excluding unclassified (i.e., overlap boundary areas, or 0)
+                        double totalPixels = counts.Where(e => e.key != 0).Sum(e => e.val);
+
+                        // Count percentage of valid pixels and keep if > minimum allowed
+                        double validPixels = pixels1D.Where(e => validClasses.Contains(e)).ToArray().Length;
+
+                        if ((validPixels / totalPixels) < minValid)
+                        {
+                            item.Valid = false;
+                        }
+                        else
+                        {
+                            item.Valid = true;
+                        }
+
+                        // TODO: Delete image for current item
+                        //
+
+                        // Notify
+                        System.Diagnostics.Debug.WriteLine($"Checked mask pixel: {item.Date}");
+
+                        // Increment progressor bar
+                        i = i + 1;
+                        progress.Report(i);
+                    }));
+                    #endregion
+
+                    // Remove invalid dates
+                    items = items.Where(e => e.Valid == true).ToList();
+
+
+                    //TODO: dispose conn, store
+                    //
+
+
+                    // Initialise progressor
+                    ProgressValue = 0;
+                    MaxProgressValue = items.Count;
+                    progress = new Progress<int>(e => ProgressValue = e);
+
+                    #region Download valid data to temporary folder
+                    // Download fmask geotiffs to temporary folder
+                    i = 0;
+                    await QueuedTask.Run(() => Parallel.ForEachAsync(items, options, async (item, token) =>
+                    {
+                        // Notify
+                        System.Diagnostics.Debug.WriteLine($"Started download: {item.Date}");
+
+                        // Create output filename and path for current item
+                        string filepath = Path.Join(tmpFolder, item.FullFilename);
+
+                        // Query WCS full URL and ensure success
+                        var response = await client.GetAsync(item.FullWcsUrl);
+                        response.EnsureSuccessStatusCode();
+
+                        // Download temporary file to temporary folder
+                        // TODO: make sure access is available
+                        // TODO: make sure file doesnt already exist
+                        using (FileStream fs = new FileStream(filepath, FileMode.CreateNew))
+                        {
+                            await response.Content.CopyToAsync(fs);
+                        }
+
+                        // Notify
+                        System.Diagnostics.Debug.WriteLine($"Finished download: {item.Date}");
+
+                        // Increment progress bar
+                        i = i + 1;
+                        progress.Report(i);
+                    }));
+
+                    //TODO: clean up
+                    //
+                    #endregion
+
+                    // Re-initialise progressor
+                    ProgressValue = 0;
+                    MaxProgressValue = items.Count;
+                    progress = new Progress<int>(e => ProgressValue = e);
+
+                    #region Remove invalid pixels and save to final output folder
+                    // Create connection to final output folder file store
+                    conn = new FileSystemConnectionPath(new Uri(tmpFolder), FileSystemDatastoreType.Raster);
+                    var outConn = new FileSystemConnectionPath(new Uri(outputFolder), FileSystemDatastoreType.Raster);
+
+                    // Set nodata value
+                    Int16 noDataValue = -1;
+
+                    i = 0;
+                    await QueuedTask.Run(() => Parallel.ForEachAsync(items, options, async (item, token) =>
+                    {
+                        // Notify
+                        System.Diagnostics.Debug.WriteLine($"Started final download: {item.Date}");
+
+                        // Create full output folder path
+                        string tmpFilepath = Path.Join(outputFolder, item.FullFilename);
+                        string outFilepath = Path.Join(outputFolder, item.FinalFilename);
+
+                        // Create connection to file
+                        FileSystemDatastore store = new FileSystemDatastore(conn);
+
+                        // Read raster from store
+                        RasterDataset rasterDataset = store.OpenDataset<RasterDataset>(item.FullFilename);
+                        Raster raster = rasterDataset.CreateFullRaster();
+
+                        // Get a pixel block for quicker reading and read from pixel top left pixel
+                        int blockHeight = raster.GetHeight();
+                        int blockWidth = raster.GetWidth();
+                        PixelBlock block = raster.CreatePixelBlock(blockWidth, blockHeight);
+                        raster.Read(0, 0, block);
+
+                        // 
+                        var maskIndex = rasterDataset.GetBandIndex("oa_fmask");
+
+                        //
+                        Array maskPixels = block.GetPixelData(maskIndex, true);
+                        for (int plane = 0; plane < block.GetPlaneCount() - 1; plane++)  // -1 to ignore mask band
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Working on band: {plane}");
+
+                            Array bandPixels = block.GetPixelData(plane, true);
+                            for (int i = 0; i < block.GetHeight(); i++)
+                            {
+                                for (int j = 0; j < block.GetWidth(); j++)
+                                {
+                                    Int16 maskValue = Convert.ToInt16(maskPixels.GetValue(j, i));
+                                    if (maskValue == 0)
+                                    {
+                                        bandPixels.SetValue(noDataValue, j, i);
+                                    }
+                                }
+                            }
+
+                            // Update block with new values
+                            block.SetPixelData(plane, bandPixels);
+
+                            // Notify
+                            System.Diagnostics.Debug.WriteLine($"Finished on band: {plane}");
+                        }
+
+                        // Set store for output folder
+                        FileSystemDatastore outStore = new FileSystemDatastore(outConn);
+                        
+                        // Write raster to folder
+                        raster.Write(0, 0, block);
+                        raster.SetNoDataValue(noDataValue);
+                        raster.SaveAs("_" + item.FinalFilename, outStore, "TIFF");
+
+                        //Unclassified-> 0.
+                        //Clear-> 1.
+                        //Cloud-> 2.
+                        //Cloud Shadow -> 3.
+                        //Snow-> 4.
+                        //Water-> 5.
+
+                        // Notify
+                        System.Diagnostics.Debug.WriteLine($"Ended final download: {item.Date}");
+
+                        // Increment progressor bar
+                        i = i + 1;
+                        progress.Report(i);
+                    }));
+                    #endregion
                 });
             }
         }
     }
 
+
     
+
 
     /// <summary>
     /// Button implementation to show the DockPane.

@@ -188,7 +188,7 @@ namespace ArcDEA.Classes
 
                 // todo make max degree parallel dynamic
                 ParallelOptions options = new ParallelOptions();
-                options.MaxDegreeOfParallelism = 1;  
+                options.MaxDegreeOfParallelism = 3;  
 
                 List<string> invalidDates = new List<string>();
                 Parallel.ForEach(items, options, item => 

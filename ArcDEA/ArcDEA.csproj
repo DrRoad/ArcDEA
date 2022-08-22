@@ -27,6 +27,10 @@
     <None Include="Module1.cs" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="GDAL" Version="3.5.0" />
+    <PackageReference Include="GDAL.Native" Version="3.5.0" />
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="ArcGIS.Desktop.Framework">
       <HintPath>C:\Program Files\ArcGIS\Pro\bin\ArcGIS.Desktop.Framework.dll</HintPath>
       <CopyLocal>False</CopyLocal>

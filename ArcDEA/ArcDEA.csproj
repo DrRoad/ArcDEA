@@ -8,12 +8,164 @@
     <NoWarn>CA1416</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="Libs\GDAL64\adrg.dll" />
+    <None Remove="Libs\GDAL64\concrt140.dll" />
+    <None Remove="Libs\GDAL64\freexl.dll" />
+    <None Remove="Libs\GDAL64\gdal305.dll" />
+    <None Remove="Libs\GDAL64\gdalconst_wrap.dll" />
+    <None Remove="Libs\GDAL64\gdal_wrap.dll" />
+    <None Remove="Libs\GDAL64\geos.dll" />
+    <None Remove="Libs\GDAL64\geos_c.dll" />
+    <None Remove="Libs\GDAL64\iconv-2.dll" />
+    <None Remove="Libs\GDAL64\libcrypto-1_1-x64.dll" />
+    <None Remove="Libs\GDAL64\libcurl.dll" />
+    <None Remove="Libs\GDAL64\libexpat.dll" />
+    <None Remove="Libs\GDAL64\libmysql.dll" />
+    <None Remove="Libs\GDAL64\libpq.dll" />
+    <None Remove="Libs\GDAL64\librttopo.dll" />
+    <None Remove="Libs\GDAL64\libssl-1_1-x64.dll" />
+    <None Remove="Libs\GDAL64\libxml2.dll" />
+    <None Remove="Libs\GDAL64\msvcp140.dll" />
+    <None Remove="Libs\GDAL64\msvcp140_1.dll" />
+    <None Remove="Libs\GDAL64\msvcp140_2.dll" />
+    <None Remove="Libs\GDAL64\ogdi.dll" />
+    <None Remove="Libs\GDAL64\ogr_wrap.dll" />
+    <None Remove="Libs\GDAL64\openjp2.dll" />
+    <None Remove="Libs\GDAL64\osr_wrap.dll" />
+    <None Remove="Libs\GDAL64\proj_7_2.dll" />
+    <None Remove="Libs\GDAL64\remote.dll" />
+    <None Remove="Libs\GDAL64\rpf.dll" />
+    <None Remove="Libs\GDAL64\skeleton.dll" />
+    <None Remove="Libs\GDAL64\spatialite.dll" />
+    <None Remove="Libs\GDAL64\sqlite3.dll" />
+    <None Remove="Libs\GDAL64\tiff.dll" />
+    <None Remove="Libs\GDAL64\tiffxx.dll" />
+    <None Remove="Libs\GDAL64\vcruntime140.dll" />
+    <None Remove="Libs\GDAL64\vcruntime140_1.dll" />
+    <None Remove="Libs\GDAL64\vrf.dll" />
+    <None Remove="Libs\GDAL64\xerces-c_3_2.dll" />
+    <None Remove="Libs\GDAL64\zlib.dll" />
+    <None Remove="Libs\GDAL64\zstd.dll" />
     <None Remove="Images\AddinDesktopDEA32.png" />
     <None Remove="Images\BrowseFolder16.png" />
     <None Remove="Images\DrawNewQueryArea16.png" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Config.daml" />    
+    <Content Include="Config.daml" />
+    <Content Include="Libs\GDAL64\adrg.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\concrt140.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\freexl.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\gdal305.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\gdalconst_wrap.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\gdal_wrap.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\geos.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\geos_c.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\iconv-2.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\libcrypto-1_1-x64.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\libcurl.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\libexpat.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\libmysql.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\libpq.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\librttopo.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\libssl-1_1-x64.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\libxml2.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\msvcp140.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\msvcp140_1.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\msvcp140_2.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\ogdi.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\ogr_wrap.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\openjp2.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\osr_wrap.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\proj_7_2.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\remote.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\rpf.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\skeleton.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\spatialite.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\sqlite3.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\tiff.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\tiffxx.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\vcruntime140.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\vcruntime140_1.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\vrf.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\xerces-c_3_2.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\zlib.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libs\GDAL64\zstd.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>    
     <Content Include="Images\AddInDesktop16.png" />
     <Content Include="Images\AddInDesktop32.png" />
     <Content Include="DarkImages\AddInDesktop16.png" />

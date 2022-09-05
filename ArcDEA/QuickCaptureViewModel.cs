@@ -21,13 +21,13 @@ using System.Windows.Input;
 using System.Collections.ObjectModel;
 using ArcGIS.Desktop.Mapping.Events;
 using ArcDEA.Classes;
-using static ArcDEA.Classes.DataStructures;
 using System.Threading;
 using System.Windows.Threading;
 using System.Net.Http;
 using System.IO;
 using ArcGIS.Core.Data.Raster;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace ArcDEA
 {
@@ -223,30 +223,64 @@ namespace ArcDEA
 
         #region QueryCollection controls
         /// <summary>
-        /// Observable list of available DEA data collections.
+        /// Item to hold collection information and selections.
         /// </summary>
-        private ObservableCollection<CollectionItem> _queryCollections = new ObservableCollection<CollectionItem>() { new CollectionItem("ga_ls8c_ard_3", "Landsat 8 ARD 3") };
-        public ObservableCollection<CollectionItem> QueryCollections
+        public class CollectionItem
+        {
+            public string RawName { get; set; }
+            public string CleanName { get; set; }
+            public bool IsCollectionSelected { get; set; }
+
+            public CollectionItem(string rawName, string cleanName, bool isCollectionSelected)
+            {
+                RawName = rawName;
+                CleanName = cleanName;
+                IsCollectionSelected = isCollectionSelected;
+            }
+        }
+
+        /// <summary>
+        /// List of available DEA data collections.
+        /// </summary>
+        private List<CollectionItem> _queryCollections = new List<CollectionItem>() { new CollectionItem("ga_ls5t_ard_3", "Landsat 5 TM", false),
+                                                                                      new CollectionItem("ga_ls7e_ard_3", "Landsat 7 ETM+", false),
+                                                                                      new CollectionItem("ga_ls8c_ard_3", "Landsat 8 OLI", false) };
+        public List<CollectionItem> QueryCollections
         {
             get { return _queryCollections; }
             set { SetProperty(ref _queryCollections, value, () => QueryCollections); }
         }
 
         /// <summary>
-        /// Selected collection item from combobox.
+        /// Tracks CollectionItems that have been selected in listbox. Binds
+        /// ListItem IsSelected to CollectionItem IsCollectionSelected property.
         /// </summary>
-        private CollectionItem _selectedQueryCollection;
-        public CollectionItem SelectedQueryCollection
+        private bool _isCollectionSelected;
+        public bool IsCollectionSelected
         {
-            get { return _selectedQueryCollection; }
-            set
-            {
-                SetProperty(ref _selectedQueryCollection, value, () => SelectedQueryCollection);
-            }
+            get { return _isCollectionSelected; }
+            set { SetProperty(ref _isCollectionSelected, value, () => IsCollectionSelected); }
         }
         #endregion
 
         #region QueryAsset controls
+        /// <summary>
+        /// Item to hold asset information and selections.
+        /// </summary>
+        public class AssetItem
+        {
+            public string RawName { get; set; }
+            public string CleanName { get; set; }
+            public bool IsAssetSelected { get; set; }
+
+            public AssetItem(string rawName, string cleanName, bool isAssetSelected)
+            {
+                RawName = rawName;
+                CleanName = cleanName;
+                IsAssetSelected = isAssetSelected;
+            }
+        }
+
         /// <summary>
         /// List of available assets (i.e., bands) for current DEA data collection.
         /// </summary>
@@ -255,8 +289,7 @@ namespace ArcDEA
                                                                        new AssetItem("nbart_red",    "Red",    false),
                                                                        new AssetItem("nbart_nir",    "NIR",    false),
                                                                        new AssetItem("nbart_swir_1", "SWIR 1", false),
-                                                                       new AssetItem("nbart_swir_2", "SWIR 2", false),
-                                                                       new AssetItem("oa_fmask",     "FMask",  false)};
+                                                                       new AssetItem("nbart_swir_2", "SWIR 2", false)};
         public List<AssetItem> QueryAssets
         {
             get { return _queryAssets; }
@@ -279,8 +312,8 @@ namespace ArcDEA
         /// <summary>
         /// Percentage cloud cover slider control.
         /// </summary>
-        private double _queryCloudCover = 0;
-        public double QueryCloudCover
+        private float _queryCloudCover = 0;
+        public float QueryCloudCover
         {
             get { return _queryCloudCover; }
             set { SetProperty(ref _queryCloudCover, value, () => QueryCloudCover); }
@@ -337,7 +370,6 @@ namespace ArcDEA
         }
         #endregion
 
-        // TODO: Make progress status for percent only, and make a regular text box out of here for messages
         #region Progress controls
         /// <summary>
         /// Current value of progress for incrementing progress bar.
@@ -360,17 +392,54 @@ namespace ArcDEA
         }
 
         /// <summary>
-        /// Percentage of progress for display in textbox.
+        /// Progress message for display in textbox.
         /// </summary>
-        private string _progressStatus;
-        public string ProgressStatus
+        private string _progressMessage;
+        public string ProgressMessage
         {
-            get { return _progressStatus; }
-            set { SetProperty(ref _progressStatus, value, () => ProgressStatus); }
+            get { return _progressMessage; }
+            set { SetProperty(ref _progressMessage, value, () => ProgressMessage); }
+        }
+
+        /// <summary>
+        /// Progress percentage for display in textbox.
+        /// </summary>
+        private string _progressPercentage;
+        public string ProgressPercentage
+        {
+            get { return _progressPercentage; }
+            set { SetProperty(ref _progressPercentage, value, () => ProgressPercentage); }
+        }
+
+        /// <summary>
+        /// Sets whether the progress bar progresses or interminates.
+        /// </summary>
+        private bool _isProgressInterminate = false;
+        public bool IsProgressInterminate
+        {
+            get { return _isProgressInterminate; }
+            set { SetProperty(ref _isProgressInterminate, value, () => IsProgressInterminate); }
+        }
+        public void RefreshProgressBar(int min, int max, string message, bool isInterminate)
+        {
+            ProgressValue = min;
+            MaxProgressValue = max;
+            ProgressMessage = message;
+            IsProgressInterminate = isInterminate;
         }
         #endregion
 
-
+        #region Processing controls
+        /// <summary>
+        /// Sets whether the process is running or not.
+        /// </summary>
+        private bool _isPocessing = false;
+        public bool IsProcessing
+        {
+            get { return _isPocessing; }
+            set { SetProperty(ref _isPocessing, value, () => IsProcessing); }
+        }
+        #endregion
 
         /// <summary>
         /// Button for running query and obtaining collection data.
@@ -380,11 +449,36 @@ namespace ArcDEA
             get
             {
                 return new RelayCommand(async () =>
-                {                   
-                    // Reset progressor
-                    ProgressValue = 0;
-                    MaxProgressValue = 100;
-                    IProgress<int> progress = new Progress<int>(e => ProgressValue = e);
+                {
+                    #region General initialisation
+                    // Set that process is running
+                    //IsProcessing = true;
+
+                    // Set progressor
+                    RefreshProgressBar(0, 100, "Initialising...", true);
+                    ProgressPercentage = "";
+                    IProgress<int> progressValue = new Progress<int>(e => ProgressValue = e);
+                    IProgress<string> progressPercent = new Progress<string>(e => ProgressPercentage = e);
+
+                    // Register GDAL and set config options
+                    OSGeo.GDAL.Gdal.AllRegister();
+                    OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_UNSAFESSL", "YES");
+                    OSGeo.GDAL.Gdal.SetConfigOption("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR");
+                    OSGeo.GDAL.Gdal.SetConfigOption("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", "tif");
+                    OSGeo.GDAL.Gdal.SetConfigOption("VSI_CACHE", "TRUE");
+                    OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_MULTIRANGE", "YES");
+                    OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_MERGE_CONSECUTIVE_RANGES", "YES");
+
+                    // Get the ArcGIS temporary folder path
+                    string tmpFolder = Path.GetTempPath();
+
+                    // Set download and processing num cores
+                    var numCores = new ParallelOptions { MaxDegreeOfParallelism = 15 };  // TODO: make this dynamic
+
+                    // Open a HTTP client with 30 minute timeout
+                    var client = new HttpClient();
+                    client.Timeout = TimeSpan.FromMinutes(30);
+                    #endregion
 
                     #region Get and check parameters from UI
                     // Get bounding box of graphic in wgs84 and albers
@@ -405,40 +499,73 @@ namespace ArcDEA
                     string endDate = QueryEndDate.ToString("yyyy'-'MM'-'dd");
 
                     // Get selected collection (as raw collection name)
-                    // TODO: make collection a list
-                    string collection = SelectedQueryCollection.RawName;
-                    if (collection == null)
+                    List<string> collections = QueryCollections.Where(e => e.IsCollectionSelected).Select(e => e.RawName).ToList();
+                    if (collections.Count == 0)
                     {
                         return;
                     }
 
-                    // Get selected asset(s)
-                    List<string> assets = QueryAssets.Where(e => e.IsAssetSelected).Select(e => e.RawName).ToList();
-                    if (assets.Count == 0)
+                    // Get selected asset(s) and ensure oa_fmask band is included
+                    var assets = new List<string>();
+                    string assetType = "index";  // TODO: take this from ui: raw, index, calculator
+                    if (assetType == "raw")
                     {
-                        return;
+                        assets = QueryAssets.Where(e => e.IsAssetSelected).Select(e => e.RawName).ToList();
+                        if (assets.Count == 0)
+                        {
+                            return;
+                        }
+                    }
+                    else if (assetType == "index")
+                    {
+                        // TODO: send this to asset get
+                        //list of assets GetAssetsForIndex(indexName)
+                        assets = new List<string>() { "nbart_red", "nbart_nir" };
+                    }
+
+                    // Ensure we have a QA mask band at the end
+                    if (!assets.Contains("oa_fmask"))
+                    {
+                        assets.Add("oa_fmask");
                     }
 
                     // Setup valid classes and minimum valid pixels
                     // TODO: make dynamic add to UI
-                    List<int> validClasses = new List<int> { 1, 4, 5 };  
-                    double minValid = 1.0 - (QueryCloudCover / 100);
+                    List<int> validPixels = new List<int> { 1, 4, 5 };
+                    float minValid = Convert.ToSingle(1.0 - (QueryCloudCover / 100));
+
+                    // Setup nodata value
+                    // TODO: add this to UI
+                    Int16 noDataValue = -999;
 
                     // Set user's output folder path
                     string outputFolder = OutputFolderPath;
                     //if (outputFolder == null || !Directory.Exists(outputFolder))
                     //{
-                    //return;
+                        //return;
                     //}
-                    #endregion                    
+
+                    // Set number of download retries
+                    // TODO: implement this in UI
+                    //int numRetries = 5;
+                    #endregion
 
                     #region Construct STAC results and download structure
-                    // Construct STAC url from provided parameters, abort if nothing
-                    // TODO: put this into an iterator for multiple collections
+                    // Set progressor
+                    RefreshProgressBar(1, 100, "Querying STAC endpoint...", true);
+
+                    // Construct STAC url, roots and flatten them into one
                     Root root = await QueuedTask.Run(async () =>
                     {
-                        string url = Data.ConstructStacUrl(collection, startDate, endDate, bboxWgs84, 500);
-                        return await Data.GetStacFromUrlAsync(url);
+                        List<Root> roots = new List<Root>();
+                        foreach (string collection in collections)
+                        {
+                            string url = Data.ConstructStacUrl(collection, startDate, endDate, bboxWgs84, 500);
+                            Root root = await Data.GetStacFromUrlAsync(url);
+                            roots.Add(root);
+                        }
+
+                        return Data.FlattenStacRoots(roots);
                     });
                     if (root.Features.Count == 0)
                     {
@@ -451,267 +578,56 @@ namespace ArcDEA
                     items = Data.GroupBySolarDay(items);
                     #endregion
 
+                    #region Stream and assess fmask data
+                    // Set progressor
+                    RefreshProgressBar(1, items.Count, "Downloading and assessing fmask data...", false);
 
-                    // Initialise progressor
-                    ProgressValue = 0;
-                    MaxProgressValue = items.Count;
-                    progress = new Progress<int>(e => ProgressValue = e);
-
-                    #region Download fmask data to temporary folder
-                    // Get the ArcGIS temporary folder path
-                    string tmpFolder = Path.GetTempPath();
-
-                    // Open a HTTP client with 60 minute timeout
-                    var client = new HttpClient();
-                    client.Timeout = TimeSpan.FromMinutes(60);
-
-                    // Set up number of cores for download (max available - 1)
-                    var options = new ParallelOptions
-                    {
-                        MaxDegreeOfParallelism = Environment.ProcessorCount
-                    };
-
-                    // Download fmask geotiffs to temporary folder
                     int i = 0;
-                    await QueuedTask.Run(() => Parallel.ForEachAsync(items, options, async (item, token) =>
+                    await QueuedTask.Run(() => Parallel.ForEachAsync(items, numCores, async (item, token) =>
                     {
-                        // Notify
-                        System.Diagnostics.Debug.WriteLine($"Started download: {item.Date}");
+                        // Download mask geotiff, get num valid pixels, flag item as valid (or not)
+                        await item.SetValidViaWcsMaskAsync(minValid, validPixels, client);
 
-                        // Create output filename and path for current item
-                        string filepath = Path.Join(tmpFolder, item.MaskFilename);
-
-                        // Query WCS mask URL and ensure success
-                        var response = await client.GetAsync(item.MaskWcsUrl);
-                        response.EnsureSuccessStatusCode();
-
-                        // Download temporary file to temporary folder
-                        // TODO: make sure access is available
-                        // TODO: make sure file doesnt already exist
-                        using (FileStream fs = new FileStream(filepath, FileMode.CreateNew))
-                        {
-                            await response.Content.CopyToAsync(fs);
-                        }
-
-                        // Notify
-                        System.Diagnostics.Debug.WriteLine($"Finished download: {item.Date}");
-
-                        // Increment progress bar
+                        // Increment progress 
                         i = i + 1;
-                        progress.Report(i);
+                        if (i % 5 == 0)
+                        {
+                            progressValue.Report(i);
+                            progressPercent.Report($"{Convert.ToInt32(i / MaxProgressValue * 100)}%");
+                        }
                     }));
 
-                    //TODO: clean up
-                    //
-                    #endregion
-
-                    // Re-initialise progressor
-                    ProgressValue = 0;
-                    MaxProgressValue = items.Count;
-                    progress = new Progress<int>(e => ProgressValue = e);
-
-                    #region Check and remove fmask data for invalid scenes
-                    // Create connection to temporary folder file store
-                    Uri folderUri = new Uri(tmpFolder);
-                    FileSystemConnectionPath conn = new FileSystemConnectionPath(folderUri, FileSystemDatastoreType.Raster);
-
-                    //
-                    i = 0;
-                    await QueuedTask.Run(() => Parallel.ForEachAsync(items, options, async (item, token) =>
-                    {
-                        // Notify
-                        System.Diagnostics.Debug.WriteLine($"Checking mask pixels: {item.Date}");
-
-                        // Open new store
-                        FileSystemDatastore store = new FileSystemDatastore(conn);
-
-                        // Read raster from store
-                        RasterDataset rasterDataset = store.OpenDataset<RasterDataset>(item.MaskFilename);
-                        Raster raster = rasterDataset.CreateFullRaster();
-
-                        // Get a pixel block for quicker reading and read from pixel top left pixel
-                        PixelBlock block = raster.CreatePixelBlock(raster.GetWidth(), raster.GetHeight());
-                        raster.Read(0, 0, block);
-
-                        // Read 2-dimensional pixel values into 1-dimensional byte array
-                        Array pixels2D = block.GetPixelData(0, false);
-                        byte[] pixels1D = new byte[pixels2D.Length];
-                        Buffer.BlockCopy(pixels2D, 0, pixels1D, 0, pixels2D.Length);
-
-                        // Get distinct pixel values and their counts
-                        var counts = pixels1D.GroupBy(e => e).Select(x => new { key = x.Key, val = x.Count() }).ToList();
-
-                        // Get the total of all pixels excluding unclassified (i.e., overlap boundary areas, or 0)
-                        double totalPixels = counts.Where(e => e.key != 0).Sum(e => e.val);
-
-                        // Count percentage of valid pixels and keep if > minimum allowed
-                        double validPixels = pixels1D.Where(e => validClasses.Contains(e)).ToArray().Length;
-
-                        if ((validPixels / totalPixels) < minValid)
-                        {
-                            item.Valid = false;
-                        }
-                        else
-                        {
-                            item.Valid = true;
-                        }
-
-                        // TODO: Delete image for current item
-                        //
-
-                        // Notify
-                        System.Diagnostics.Debug.WriteLine($"Checked mask pixel: {item.Date}");
-
-                        // Increment progressor bar
-                        i = i + 1;
-                        progress.Report(i);
-                    }));
-                    #endregion
-
-                    // Remove invalid dates
+                    // Subset items to only those flagged as valid
                     items = items.Where(e => e.Valid == true).ToList();
-
-
-                    //TODO: dispose conn, store
-                    //
-
-
-                    // Initialise progressor
-                    ProgressValue = 0;
-                    MaxProgressValue = items.Count;
-                    progress = new Progress<int>(e => ProgressValue = e);
-
-                    #region Download valid data to temporary folder
-                    // Download fmask geotiffs to temporary folder
-                    i = 0;
-                    await QueuedTask.Run(() => Parallel.ForEachAsync(items, options, async (item, token) =>
-                    {
-                        // Notify
-                        System.Diagnostics.Debug.WriteLine($"Started download: {item.Date}");
-
-                        // Create output filename and path for current item
-                        string filepath = Path.Join(tmpFolder, item.FullFilename);
-
-                        // Query WCS full URL and ensure success
-                        var response = await client.GetAsync(item.FullWcsUrl);
-                        response.EnsureSuccessStatusCode();
-
-                        // Download temporary file to temporary folder
-                        // TODO: make sure access is available
-                        // TODO: make sure file doesnt already exist
-                        using (FileStream fs = new FileStream(filepath, FileMode.CreateNew))
-                        {
-                            await response.Content.CopyToAsync(fs);
-                        }
-
-                        // Notify
-                        System.Diagnostics.Debug.WriteLine($"Finished download: {item.Date}");
-
-                        // Increment progress bar
-                        i = i + 1;
-                        progress.Report(i);
-                    }));
-
-                    //TODO: clean up
-                    //
                     #endregion
 
-                    // Re-initialise progressor
-                    ProgressValue = 0;
-                    MaxProgressValue = items.Count;
-                    progress = new Progress<int>(e => ProgressValue = e);
-
-                    #region Remove invalid pixels and save to final output folder
-                    // Create connection to final output folder file store
-                    conn = new FileSystemConnectionPath(new Uri(tmpFolder), FileSystemDatastoreType.Raster);
-                    var outConn = new FileSystemConnectionPath(new Uri(outputFolder), FileSystemDatastoreType.Raster);
-
-                    // Set nodata value
-                    Int16 noDataValue = -1;
+                    #region Stream valid data, set invalid pixels to NoData, save to folder
+                    // Set progressor
+                    RefreshProgressBar(1, items.Count, "Downloading and processing satellite data...", false);
+                    ProgressPercentage = "";
 
                     i = 0;
-                    await QueuedTask.Run(() => Parallel.ForEachAsync(items, options, async (item, token) =>
+                    await QueuedTask.Run(() => Parallel.ForEachAsync(items, numCores, async (item, token) =>
                     {
-                        // Notify
-                        System.Diagnostics.Debug.WriteLine($"Started final download: {item.Date}");
+                        // Download full geotiff, set invalid pixels to nodata, save to folder
+                        //await item.DownloadAndProcessViaFullAsync(outputFolder, validPixels, noDataValue, client);
+                        string index = "ndvi";
+                        await item.DownloadAndProcessViaIndexAsync(index, outputFolder, validPixels, noDataValue, client);
 
-                        // Create full output folder path
-                        string tmpFilepath = Path.Join(outputFolder, item.FullFilename);
-                        string outFilepath = Path.Join(outputFolder, item.FinalFilename);
-
-                        // Create connection to file
-                        FileSystemDatastore store = new FileSystemDatastore(conn);
-
-                        // Read raster from store
-                        RasterDataset rasterDataset = store.OpenDataset<RasterDataset>(item.FullFilename);
-                        Raster raster = rasterDataset.CreateFullRaster();
-
-                        // Get a pixel block for quicker reading and read from pixel top left pixel
-                        int blockHeight = raster.GetHeight();
-                        int blockWidth = raster.GetWidth();
-                        PixelBlock block = raster.CreatePixelBlock(blockWidth, blockHeight);
-                        raster.Read(0, 0, block);
-
-                        // 
-                        var maskIndex = rasterDataset.GetBandIndex("oa_fmask");
-
-                        //
-                        Array maskPixels = block.GetPixelData(maskIndex, true);
-                        for (int plane = 0; plane < block.GetPlaneCount() - 1; plane++)  // -1 to ignore mask band
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Working on band: {plane}");
-
-                            Array bandPixels = block.GetPixelData(plane, true);
-                            for (int i = 0; i < block.GetHeight(); i++)
-                            {
-                                for (int j = 0; j < block.GetWidth(); j++)
-                                {
-                                    Int16 maskValue = Convert.ToInt16(maskPixels.GetValue(j, i));
-                                    if (maskValue == 0)
-                                    {
-                                        bandPixels.SetValue(noDataValue, j, i);
-                                    }
-                                }
-                            }
-
-                            // Update block with new values
-                            block.SetPixelData(plane, bandPixels);
-
-                            // Notify
-                            System.Diagnostics.Debug.WriteLine($"Finished on band: {plane}");
-                        }
-
-                        // Set store for output folder
-                        FileSystemDatastore outStore = new FileSystemDatastore(outConn);
-                        
-                        // Write raster to folder
-                        raster.Write(0, 0, block);
-                        raster.SetNoDataValue(noDataValue);
-                        raster.SaveAs("_" + item.FinalFilename, outStore, "TIFF");
-
-                        //Unclassified-> 0.
-                        //Clear-> 1.
-                        //Cloud-> 2.
-                        //Cloud Shadow -> 3.
-                        //Snow-> 4.
-                        //Water-> 5.
-
-                        // Notify
-                        System.Diagnostics.Debug.WriteLine($"Ended final download: {item.Date}");
-
-                        // Increment progressor bar
+                        // Increment progress
                         i = i + 1;
-                        progress.Report(i);
+                        progressValue.Report(i);
+                        progressPercent.Report($"{Convert.ToInt32(i / MaxProgressValue * 100)}%");
                     }));
                     #endregion
+
+                    // Final message
+                    RefreshProgressBar(1, 1, "Finished.", false);
+                    ProgressPercentage = "";
                 });
             }
         }
     }
-
-
-    
-
 
     /// <summary>
     /// Button implementation to show the DockPane.

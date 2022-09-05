@@ -1,0 +1,310 @@
+﻿//#region Download fmask data to temporary folder
+//// Set progressor
+//RefreshProgressBar(1, items.Count, "Downloading fmask data...", false);
+
+//// Download fmask geotiffs to temporary folder
+//int i = 0;
+//await QueuedTask.Run(() => Parallel.ForEachAsync(items, paraDownloadOptions, async (item, token) =>
+//{
+//    using (var response = await client.GetAsync(item.MaskWcsUrl))
+//    {
+//        response.EnsureSuccessStatusCode(); // TODO: handle exception
+
+//        string filepath = Path.Join(tmpFolder, item.MaskFilename);
+//        using (FileStream fs = new FileStream(filepath, FileMode.CreateNew))
+//        {
+//            await response.Content.CopyToAsync(fs);  // TODO: handle exception
+//        }
+//    }
+
+//    // Increment progress 
+//    i = i + 1;
+//    if (i % 5 == 0)
+//    {
+//        progressValue.Report(i);
+//        progressPercent.Report($"{Convert.ToInt32(i / MaxProgressValue * 100)}%");
+//    }
+//}));
+//#endregion
+
+//#region Check and remove fmask data for invalid scenes
+//// Set progressor
+//RefreshProgressBar(1, items.Count, "Removing invalid data via fmask...", false);
+//ProgressPercentage = "";
+
+//// Establish connection to temporary folder
+//Uri folderUri = new Uri(tmpFolder);
+//FileSystemConnectionPath tmpConn = new FileSystemConnectionPath(folderUri, FileSystemDatastoreType.Raster);
+
+//i = 0;
+//await QueuedTask.Run(() => Parallel.ForEach(items, paraProcessingOptions, (item, token) =>
+//{
+//    // New data store connection
+//    FileSystemDatastore store = new FileSystemDatastore(tmpConn);
+
+//    // Read raster from store
+//    RasterDataset rasterDataset = store.OpenDataset<RasterDataset>(item.MaskFilename);
+//    Raster raster = rasterDataset.CreateFullRaster();
+
+//    // Get distinct pixel value counts for raster
+//    Dictionary<string, double> percents = Data.GetPercentValidPixels(raster, validClasses);
+
+//    // Flag image as invalid if all overlap or < min valid threshold
+//    item.Valid = true;
+//    if (percents["pctOverlap"] == 1 || percents["pctValid"] < minValid)
+//    {
+//        item.Valid = false;
+//    }
+
+//    // TODO: Delete image for current item
+//    //
+
+//    // Increment progress 
+//    i = i + 1;
+//    if (i % 5 == 0)
+//    {
+//        progressValue.Report(i);
+//        progressPercent.Report($"{Convert.ToInt32(i / MaxProgressValue * 100)}%");
+//    }
+//}));
+
+//// Remove invalid dates
+//items = items.Where(e => e.Valid == true).ToList();
+//#endregion
+
+//#region Download valid data to temporary folder
+//// Set progressor
+//RefreshProgressBar(1, items.Count, "Downloading satellite data...", false);
+//ProgressPercentage = "";
+
+//// Download satellite geotiffs to temporary folder
+//i = 0;
+//await QueuedTask.Run(() => Parallel.ForEachAsync(items, paraDownloadOptions, async (item, token) =>
+//{
+//    using (var response = await client.GetAsync(item.FullWcsUrl))
+//    {
+//        response.EnsureSuccessStatusCode(); // TODO: handle exception
+
+//        string filepath = Path.Join(tmpFolder, item.FullFilename);
+//        using (FileStream fs = new FileStream(filepath, FileMode.CreateNew))
+//        {
+//            await response.Content.CopyToAsync(fs);  // TODO: handle exception
+//        }
+//    }
+
+//    // Increment progress
+//    i = i + 1;
+//    progressValue.Report(i);
+//    progressPercent.Report($"{Convert.ToInt32(i / MaxProgressValue * 100)}%");
+//}));
+//#endregion
+
+
+#############################################################
+
+// Set current item validity to false until proven otherwise
+item.Valid = false;
+
+// Download mask geotiff and calculate percent valid and overlap.
+// Flag image as valid if not all overlap pixels or >= min valid threshold
+// Returns null if error.Will retry several times until max retries reached.
+for (int j = 0; j < numRetries; j++)
+{
+    Dictionary<string, float> result = item.DownloadAndCheckMaskValidity(validClasses, client);
+    if (result != null)
+    {
+        if (result["pctOverlap"] < 1.0 && result["pctValid"] >= minValid)
+        {
+            item.Valid = true;
+            break;
+        }
+    }
+}
+
+// Increment progress 
+i = i + 1;
+if (i % 5 == 0)
+{
+    progressValue.Report(i);
+    progressPercent.Report($"{Convert.ToInt32(i / MaxProgressValue * 100)}%");
+}
+
+
+#############################################################
+
+
+int i = 0;
+var tasks = new List<Task>();
+foreach (var item in items)
+{
+    tasks.Add(Task.Run(() =>
+    {
+        try
+        {
+            using (OSGeo.GDAL.Dataset ds = OSGeo.GDAL.Gdal.Open(item.MaskWcsUrl, OSGeo.GDAL.Access.GA_ReadOnly))
+            {
+                int width = ds.RasterXSize;
+                int height = ds.RasterYSize;
+                int size = width * height;
+
+                OSGeo.GDAL.Band band = ds.GetRasterBand(1);
+
+                Int16[] bits = new Int16[size];
+                band.ReadRaster(0, 0, width, height, bits, width, height, 0, 0);
+
+                var currentCounts = bits.GroupBy(e => e).Select(x => new { Key = x.Key, Value = x.Count() });
+
+                float numValid = currentCounts.Where(e => validClasses.Contains(e.Key)).Sum(e => e.Value);
+                float numOverlap = currentCounts.Where(e => e.Key == 0).Sum(e => e.Value);
+                float numTotal = bits.Length;
+
+                float pctValid = numValid / (numTotal - numOverlap);
+                float pctOverlap = numOverlap / numTotal;
+
+                // Construct output result
+                var result = new Dictionary<string, float>()
+                {
+                    {"pctValid", pctValid >= 0 ? pctValid : 0},
+                    {"pctOverlap", pctOverlap >= 0 ? pctOverlap : 0},
+                };
+
+                Debug.WriteLine($"Success on {item.Id}");
+                item.Valid = true;
+            };
+        }
+        catch
+        {
+            Debug.WriteLine($"Error on {item.Id}");
+            item.Valid = false;
+        }
+
+        // Increment progress 
+        i = i + 1;
+        if (i % 5 == 0)
+        {
+            progressValue.Report(i);
+            progressPercent.Report($"{Convert.ToInt32(i / MaxProgressValue * 100)}%");
+        }
+    }));
+}
+
+var timer = new Stopwatch();
+timer.Start();
+
+await Task.WhenAll(tasks);
+
+timer.Stop();
+var duration = timer.Elapsed;
+return;
+
+
+###########################################################
+this one keeps ui and allows for num cores, but takes 3x longr than task.whenall
+int i = 0;
+await QueuedTask.Run(() => Parallel.ForEachAsync(items, paraDownloadOptions, async (item, token) =>
+{
+    await Task.Run(() =>
+    {
+    try
+    {
+        using (OSGeo.GDAL.Dataset ds = OSGeo.GDAL.Gdal.Open(item.MaskWcsUrl, OSGeo.GDAL.Access.GA_ReadOnly))
+        {
+            int width = ds.RasterXSize;
+            int height = ds.RasterYSize;
+            int size = width * height;
+
+            OSGeo.GDAL.Band band = ds.GetRasterBand(1);
+
+            Int16[] bits = new Int16[size];
+            band.ReadRaster(0, 0, width, height, bits, width, height, 0, 0);
+
+            var currentCounts = bits.GroupBy(e => e).Select(x => new { Key = x.Key, Value = x.Count() });
+
+            float numValid = currentCounts.Where(e => validClasses.Contains(e.Key)).Sum(e => e.Value);
+            float numOverlap = currentCounts.Where(e => e.Key == 0).Sum(e => e.Value);
+            float numTotal = bits.Length;
+
+            float pctValid = numValid / (numTotal - numOverlap);
+            float pctOverlap = numOverlap / numTotal;
+
+            // Construct output result
+            var result = new Dictionary<string, float>()
+            {
+                { "pctValid", pctValid >= 0 ? pctValid : 0 },
+                { "pctOverlap", pctOverlap >= 0 ? pctOverlap : 0 },
+            };
+
+            Debug.WriteLine($"Success on {item.Id}");
+            item.Valid = true;
+        };
+    }
+    catch
+    {
+        Debug.WriteLine($"Error on {item.Id}");
+        item.Valid = false;
+    }
+
+    });
+
+    // Increment progress 
+    i = i + 1;
+    if (i % 5 == 0)
+    {
+        progressValue.Report(i);
+        progressPercent.Report($"{Convert.ToInt32(i / MaxProgressValue * 100)}%");
+    }
+}));
+
+
+timer.Stop();
+var duration = timer.Elapsed;
+return;
+
+
+
+//#region Set invalid pixels to NoData and write to final output folder
+//// Set progressor
+//RefreshProgressBar(1, items.Count, "Processing satellite data...", false);
+//ProgressPercentage = "";
+
+//// Establish connection to final output folder
+//Uri outputUri = new Uri(outputFolder);
+//FileSystemConnectionPath outConn = new FileSystemConnectionPath(outputUri, FileSystemDatastoreType.Raster);
+
+//i = 0;
+//await QueuedTask.Run(() => Parallel.ForEachAsync(items, paraProcessingOptions, async (item, token) =>
+//{
+//    // Open store to temp folder then open raster
+//    var store = new FileSystemDatastore(tmpConn);
+//    var rasterDs = store.OpenDataset<RasterDataset>(item.FullFilename);
+//    var raster = rasterDs.CreateFullRaster();
+
+
+//    // TODO: testing
+//    //Raster indexRaster = rasterDs.CreateRaster(new List<int> { 0 });
+//    //var indexRaster = Data.CalculateIndex(raster, rasterDs, "ndvi");
+//    //var idxStore = new FileSystemDatastore(outConn);
+//    //indexRaster.SaveAs("_mask_" + item.FinalFilename, idxStore, "TIFF");
+
+
+//    // Using mask band, set all pixel values to nodata where invalid
+//    int maskIndex = rasterDs.GetBandIndex("oa_fmask");
+//    raster = Data.MaskRasterInvalidPixels(raster, maskIndex, validClasses, noDataValue);
+
+//    // Set store to output folder and save processed raster
+//    var outStore = new FileSystemDatastore(outConn);
+//    raster.SaveAs("_" + item.FinalFilename, outStore, "TIFF");
+
+
+//    // TODO: drop oa_fmask band
+//    // TODO: Delete image for current item
+
+//    // Increment progress 
+//    i = i + 1;
+//    if (i % 5 == 0)
+//    {
+//        progressValue.Report(i);
+//        progressPercent.Report($"{Convert.ToInt32(i / MaxProgressValue * 100)}%");
+//    }
+//}));
+//#endregion

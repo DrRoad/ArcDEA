@@ -136,7 +136,7 @@
                 </DatePicker>
             </Grid>
         </StackPanel>
-        
+
         <!-- Collection controls-->
         <StackPanel Grid.Row="3" 
                     Margin="10" 
@@ -149,12 +149,40 @@
                        Text="Collection">
             </TextBlock>
 
-            <!-- Collection combobox-->
-            <ComboBox Name="CbxCollection" 
-                      ItemsSource="{Binding QueryCollections}" 
-                      SelectedItem="{Binding SelectedQueryCollection, Mode=TwoWay}"
-                      DisplayMemberPath='CleanName'>
-            </ComboBox>
+            <!-- Collection list-->
+            <ListBox Name="LbxCollections" 
+                     Margin="0,0,0,0" 
+                     MinHeight="50"
+                     MaxHeight="150"
+                     SelectionMode="Multiple" 
+                     ItemsSource="{Binding QueryCollections}">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="IsSelected" Value="{Binding IsCollectionSelected}"></Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="115"/>
+                                    <ColumnDefinition Width="100"/>
+                                </Grid.ColumnDefinitions>
+                            
+                                <CheckBox Grid.Column="0" 
+                                          Content="{Binding CleanName}" 
+                                          IsChecked="{Binding IsSelected, Mode=OneWay, RelativeSource={RelativeSource AncestorType=ListBoxItem, Mode=FindAncestor}}"
+                                          Focusable="False"
+                                          IsHitTestVisible="False"/>
+
+                                <TextBlock Grid.Column="1" Text="{Binding RawName, StringFormat='({0})'}"/>
+                            </Grid>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
         </StackPanel>
 
         <!-- Assets controls-->
@@ -174,15 +202,34 @@
                      MinHeight="50"
                      MaxHeight="150"
                      SelectionMode="Multiple" 
-                     ItemsSource="{Binding QueryAssets}"
-                     DisplayMemberPath='CleanName'
-                     BorderBrush="{DynamicResource Esri_BorderBrush}">
-                <!--<ItemContainerStyle="{DynamicResource Esri_ListBoxItemHighlightBrush}" -->
+                     ItemsSource="{Binding QueryAssets}">
+                
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="ListBoxItem">
                         <Setter Property="IsSelected" Value="{Binding IsAssetSelected}"></Setter>
                     </Style>
                 </ListBox.ItemContainerStyle>
+
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="75"/>
+                                    <ColumnDefinition Width="100"/>
+                                </Grid.ColumnDefinitions>
+
+                                <CheckBox Grid.Column="0" 
+                                          Content="{Binding CleanName}" 
+                                          IsChecked="{Binding IsSelected, Mode=OneWay, RelativeSource={RelativeSource AncestorType=ListBoxItem, Mode=FindAncestor}}"
+                                          Focusable="False"
+                                          IsHitTestVisible="False"/>
+
+                                <TextBlock Grid.Column="1" Text="{Binding RawName, StringFormat='({0})'}"/>
+                            </Grid>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
             </ListBox>
 
         </StackPanel>
@@ -289,8 +336,8 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2*"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="75"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- Progress bar-->
@@ -304,21 +351,39 @@
                              Minimum="1"
                              Maximum="{Binding Path=MaxProgressValue, Mode=OneWay}" 
                              Value="{Binding Path=ProgressValue, Mode=OneWay}"  
-                             IsIndeterminate="False">
+                             IsIndeterminate="{Binding Path=IsProgressInterminate, Mode=OneWay}">
                 </ProgressBar>
+                
+                <!-- Progress message and percentage stack -->
+                <StackPanel Grid.Row="1"
+                            Grid.Column="0" 
+                            Margin="0,0,0,0"
+                            Orientation="Horizontal">
 
-                <!-- Progress message-->
-                <TextBlock Name="TxtProgressMessage"  
-                           Grid.Row="1"
-                           Grid.Column="0" 
-                           Text="{Binding ProgressStatus}" 
+                    <!-- Progress message-->
+                    <TextBlock Name="TxtProgressMessage"  
+                           Margin="0,0,0,0"  
+                           MinWidth="50"
+                           VerticalAlignment="Center"
+                           Text="{Binding ProgressMessage}" 
+                           Style="{DynamicResource Esri_TextBlockRegular}"
+                           Visibility="{Binding IsProcessing}">
+                    </TextBlock>
+
+                    <!-- Progress percentage-->
+                    <TextBlock Name="TxtProgressPercentage"  
+                           Margin="5,0,0,0"
+                           MinWidth="50"
+                           VerticalAlignment="Center"
+                           Text="{Binding ProgressPercentage}" 
                            Style="{DynamicResource Esri_TextBlockRegular}">
-                </TextBlock>
+                    </TextBlock>
+                </StackPanel>
 
                 <!-- Run button-->
                 <Button Name="BtnRun" 
                         Grid.Row="1"
-                        Grid.Column="1" 
+                        Grid.Column="2" 
                         Margin="5,0,0,0" 
                         Style="{DynamicResource Esri_Button}" 
                         Content="Run"
@@ -327,5 +392,4 @@
             </Grid>
         </StackPanel>
     </Grid>
-
 </UserControl>

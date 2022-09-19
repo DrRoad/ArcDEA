@@ -34,135 +34,6 @@ namespace ArcDEA.Classes
             public bool Valid { get; set; } = false;
             public bool Error { get; set; } = false;
 
-            public async Task<int> DownloadMaskAsync(string folder, HttpClient client)
-            {
-                // Put this in viewmodel end
-                //await QueuedTask.Run(async () =>
-                //{
-                //    List<Task<int>> masks = items.Select(e => e.DownloadMaskAsync(tmpFolder, client)).ToList();
-                //    while (masks.Any())
-                //    {
-                //        // Get next task when available
-                //        Task<int> finished = await Task.WhenAny(masks);
-                //        masks.Remove(finished);
-
-                //        // Download mask geotiff
-                //        i += await finished;
-
-                //        // Increment progressor
-                //        await Task.Delay(100);
-                //        progressValue.Report(i);
-                //        progressPercent.Report($"({Math.Round(i / MaxProgressValue * 100, 2)}%)");
-                //    }
-                //});
-
-                string filepath = Path.Join(folder, MaskFilename);
-
-                using (var response = await client.GetAsync(MaskWcsUrl))
-                {
-                    response.EnsureSuccessStatusCode();
-
-                    using (FileStream fs = new FileStream(filepath, FileMode.CreateNew))
-                    {
-                        await response.Content.CopyToAsync(fs);
-                        return 1;
-                    }
-                };
-            }
-
-            public async Task<int> DownloadFullAsync(string folder, HttpClient client)
-            {
-                // Put this in viewmodel
-                //i = 0;
-                //await QueuedTask.Run(async () =>
-                //{
-                //    List<Task<int>> fulls = items.Select(e => e.DownloadFullAsync(tmpFolder, client)).ToList();
-                //    while (fulls.Any())
-                //    {
-                //        // Get next task when available
-                //        Task<int> finish = await Task.WhenAny(fulls);
-                //        fulls.Remove(finish);
-
-                //        // Download full geotiff task
-                //        i += await finish;
-
-                //        // Increment progressor
-                //        await Task.Delay(100);
-                //        progressValue.Report(i);
-                //        progressPercent.Report($"({Math.Round(i / MaxProgressValue * 100, 2)}%)");
-                //    }
-                //});
-
-                string filepath = Path.Join(folder, FullFilename);
-
-                using (var response = await client.GetAsync(FullWcsUrl))
-                {
-                    response.EnsureSuccessStatusCode();
-
-                    using (FileStream fs = new FileStream(filepath, FileMode.CreateNew))
-                    {
-                        await response.Content.CopyToAsync(fs);
-                        return 1;
-                    }
-                };
-            }
-
-            public void SetValidViaWcsMask(float minValid, List<int> validPixels, HttpClient client)
-            {
-                try
-                {
-                    // Open mask WCS url and extract first band
-                    OSGeo.GDAL.Dataset dataset = OSGeo.GDAL.Gdal.Open(MaskWcsUrl, OSGeo.GDAL.Access.GA_ReadOnly);
-                    OSGeo.GDAL.Band band = dataset.GetRasterBand(1);
-
-                    // Extract band dimensions
-                    int width = band.XSize;
-                    int height = band.YSize;
-                    int size = width * height;
-
-                    // Read pixel values into "block" array
-                    Int16[] bits = new Int16[size];
-                    band.ReadRaster(0, 0, width, height, bits, width, height, 0, 0);
-
-                    // Get distinct values and their counts
-                    var pixelCounts = bits.GroupBy(e => e).Select(x => new { Key = x.Key, Value = x.Count() });
-
-                    // Get number of valid, overlap and total pixels
-                    float numValid = pixelCounts.Where(e => validPixels.Contains(e.Key)).Sum(e => e.Value);
-                    float numOverlap = pixelCounts.Where(e => e.Key == 0).Sum(e => e.Value);
-                    float numTotal = size;
-
-                    // Calculate percentages
-                    float pctValid = numValid / (numTotal - numOverlap);
-                    float pctOverlap = numOverlap / numTotal;
-
-                    // Clean up percentages in case of nan
-                    pctValid = pctValid >= 0 ? pctValid : 0;
-                    pctOverlap = pctOverlap >= 0 ? pctOverlap : 0;
-
-                    // Flag item as valid (default is false)
-                    if (pctOverlap < 1.0 && pctValid >= minValid)
-                    {
-                        Valid = true;
-                    }
-
-                    // Close band and dataset
-                    band.Dispose();
-                    dataset.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    if (ex.Message == "HTTP error code : 400")
-                    {
-                        Error = true;
-                    }
-                    else
-                    {
-                        string huh = null;
-                    };
-                }
-            }
-
             public async Task SetValidViaWcsMaskAsync(float minValid, List<int> validPixels, HttpClient client)
             {
                 await Task.Run(() =>
@@ -214,11 +85,18 @@ namespace ArcDEA.Classes
                         {
                             Error = true;
                         }
+                        else if (ex.Message == "HTTP error code : 502")
+                        {
+                            Error = true;
+                        }
                         else
                         {
                             string huh = null;
                         };
                     }
+
+                    // Take a breath...
+                    Task.Delay(100);
                 });
             }
 
@@ -318,11 +196,18 @@ namespace ArcDEA.Classes
                         {
                             Error = true;
                         }
-                        else
+                        else if (ex.Message == "HTTP error code : 502")
+                        {
+                            Error = true;
+                        }
+                        else 
                         {
                             string huh = null;
                         };
                     }
+
+                    // Take a breath...
+                    Task.Delay(100);
                 });
             }
 
@@ -346,26 +231,6 @@ namespace ArcDEA.Classes
                         double[] geoTransform = new double[6];
                         sourceDS.GetGeoTransform(geoTransform);
 
-                        // Get source raster fmask band and all other source bands as list
-                        OSGeo.GDAL.Band sourceRedBand = null;
-                        OSGeo.GDAL.Band sourceNirBand = null;
-                        OSGeo.GDAL.Band sourceMaskBand = null;
-                        for (int b = 1; b <= sourceDS.RasterCount; b++)
-                        {
-                            if (sourceDS.GetRasterBand(b).GetDescription() == "nbart_red")
-                            {
-                                sourceRedBand = sourceDS.GetRasterBand(b);
-                            }
-                            else if (sourceDS.GetRasterBand(b).GetDescription() == "nbart_nir")
-                            {
-                                sourceNirBand = sourceDS.GetRasterBand(b);
-                            }
-                            else if(sourceDS.GetRasterBand(b).GetDescription() == "oa_fmask")
-                            {
-                                sourceMaskBand = sourceDS.GetRasterBand(b);
-                            }
-                        }
-
                         // Setup destination dataset
                         OSGeo.GDAL.Driver driver = OSGeo.GDAL.Gdal.GetDriverByName("GTiff");
                         OSGeo.GDAL.Dataset destDS = driver.Create(outputFile, width, height, 1, OSGeo.GDAL.DataType.GDT_Float32, null);
@@ -377,30 +242,106 @@ namespace ArcDEA.Classes
                         // Get destination single index band
                         OSGeo.GDAL.Band destBand = destDS.GetRasterBand(1);
 
-                        // Iterate through source pixels (per row) and calculate idnex
-                        for (int h = 0; h < height; h++)
+                        // TODO: make this more dynamic
+                        //
+
+                        // TODO: slc-off included results in rgb swir bands (but not nir)
+                        // being -999, resulting in odd ndvi outputs. Might need extra 
+                        // check, i.e. if < 0 set to 0
+
+                        // Process index based on user selection
+                        if (index.ToLower() == "ndvi")
                         {
-                            Single[] idxBits = new Single[width];
-                            Single[] redBits = new Single[width];
-                            Single[] nirBits = new Single[width];
-
-                            sourceRedBand.ReadRaster(0, h, width, 1, redBits, width, 1, 0, 0);
-                            sourceNirBand.ReadRaster(0, h, width, 1, nirBits, width, 1, 0, 0);
-
-                            for (int w = 0; w < width; w++)
+                            OSGeo.GDAL.Band sourceRedBand = null;
+                            OSGeo.GDAL.Band sourceNirBand = null;
+                            
+                            for (int b = 1; b <= sourceDS.RasterCount; b++)
                             {
-                                Single value = (nirBits[w] - redBits[w]) / (nirBits[w] + redBits[w]);
-                                idxBits[w] = Convert.ToSingle(value);
+                                if (sourceDS.GetRasterBand(b).GetDescription() == "nbart_red")
+                                {
+                                    sourceRedBand = sourceDS.GetRasterBand(b);
+                                }
+                                else if (sourceDS.GetRasterBand(b).GetDescription() == "nbart_nir")
+                                {
+                                    sourceNirBand = sourceDS.GetRasterBand(b);
+                                }
                             }
 
-                            destBand.WriteRaster(0, h, width, 1, idxBits, width, 1, 0, 0);
+                            for (int h = 0; h < height; h++)
+                            {
+                                Single[] idxBits = new Single[width];
+                                Single[] redBits = new Single[width];
+                                Single[] nirBits = new Single[width];
+
+                                sourceRedBand.ReadRaster(0, h, width, 1, redBits, width, 1, 0, 0);
+                                sourceNirBand.ReadRaster(0, h, width, 1, nirBits, width, 1, 0, 0);
+
+                                for (int w = 0; w < width; w++)
+                                {
+                                    Single value = (nirBits[w] - redBits[w]) / (nirBits[w] + redBits[w]);
+                                    idxBits[w] = Convert.ToSingle(value);
+                                }
+
+                                destBand.WriteRaster(0, h, width, 1, idxBits, width, 1, 0, 0);
+                            }
+                        }
+                        else if (index.ToLower() == "slavi")
+                        {
+                            OSGeo.GDAL.Band sourceRedBand = null;
+                            OSGeo.GDAL.Band sourceNirBand = null;
+                            OSGeo.GDAL.Band sourceSwir2Band = null;
+                            for (int b = 1; b <= sourceDS.RasterCount; b++)
+                            {
+                                if (sourceDS.GetRasterBand(b).GetDescription() == "nbart_red")
+                                {
+                                    sourceRedBand = sourceDS.GetRasterBand(b);
+                                }
+                                else if (sourceDS.GetRasterBand(b).GetDescription() == "nbart_nir")
+                                {
+                                    sourceNirBand = sourceDS.GetRasterBand(b);
+                                }
+                                else if (sourceDS.GetRasterBand(b).GetDescription() == "nbart_swir_2")
+                                {
+                                    sourceSwir2Band = sourceDS.GetRasterBand(b);
+                                }
+                            }
+
+                            for (int h = 0; h < height; h++)
+                            {
+                                Single[] idxBits = new Single[width];
+                                Single[] redBits = new Single[width];
+                                Single[] nirBits = new Single[width];
+                                Single[] swir2Bits = new Single[width];
+
+                                sourceRedBand.ReadRaster(0, h, width, 1, redBits, width, 1, 0, 0);
+                                sourceNirBand.ReadRaster(0, h, width, 1, nirBits, width, 1, 0, 0);
+                                sourceNirBand.ReadRaster(0, h, width, 1, swir2Bits, width, 1, 0, 0);
+
+                                for (int w = 0; w < width; w++)
+                                {
+                                    Single value = nirBits[w] / (redBits[w] + swir2Bits[w]);
+                                    idxBits[w] = Convert.ToSingle(value);
+                                }
+
+                                destBand.WriteRaster(0, h, width, 1, idxBits, width, 1, 0, 0);
+                            }
+                        }
+
+                        // Extract mask band
+                        OSGeo.GDAL.Band sourceMaskBand = null;
+                        for (int b = 1; b <= sourceDS.RasterCount; b++)
+                        {
+                            if (sourceDS.GetRasterBand(b).GetDescription() == "oa_fmask")
+                            {
+                                sourceMaskBand = sourceDS.GetRasterBand(b);
+                            }
                         }
 
                         // Iterate through source pixels (per row) and mask invalid pixels 
                         for (int h = 0; h < height; h++)
                         {
-                            Int16[] maskBits = new Int16[width];
                             Single[] idxBits = new Single[width];
+                            Int16[] maskBits = new Int16[width];
 
                             sourceMaskBand.ReadRaster(0, h, width, 1, maskBits, width, 1, 0, 0);
                             destBand.ReadRaster(0, h, width, 1, idxBits, width, 1, 0, 0);
@@ -431,11 +372,18 @@ namespace ArcDEA.Classes
                         {
                             Error = true;
                         }
+                        else if (ex.Message == "HTTP error code : 502")
+                        {
+                            Error = true;
+                        }
                         else
                         {
                             string huh = null;
                         };
                     }
+
+                    // Take a breath...
+                    Task.Delay(100);
                 });
             }
         }
@@ -657,13 +605,41 @@ namespace ArcDEA.Classes
         }
 
         /// <summary>
+        /// Removes any item where Landsat 7 and date > 31/5/2003 which is when SLC
+        /// sensor started failing.
+        /// </summary>
+        public static List<DownloadItem> RemoveSlcOffData(List<DownloadItem> items)
+        {
+            // SLC-off start date
+            DateTime startDateSlcOff = new DateTime(2003, 5, 31);
+
+            // Create new list of items and remove invalid landsat 7 dates
+            List<DownloadItem> cleaned = new List<DownloadItem>();
+            foreach (var item in items)
+            {
+                if (item.Platform == "landsat-7") 
+                {
+                    if (item.DateTime.Date < startDateSlcOff.Date)
+                    {
+                        cleaned.Add(item);
+                    }
+                }
+                else
+                {
+                    cleaned.Add(item);
+                }
+            }
+
+            return cleaned;
+        }
+
+
+        /// <summary>
         /// Given a raster and a list of integer pixel classes, calculates the number of
         /// valid pixels (those which exist in the classes list) excluding overlap pixels
         /// (class 0). Returns the total number of valid, total number of overlaps, and
         /// total number of pixels within the raster.
         /// </summary>
-
-        // TODO: enhance this with foreach loop 
         public static Dictionary<string, double> GetPercentValidPixels(Raster raster, List<int> classes)
         {
             // Get a pixel block for quicker reading and read from pixel top left pixel
@@ -672,13 +648,6 @@ namespace ArcDEA.Classes
 
             // Read 2-dimensional pixel values into 1-dimensional byte array
             Array pixels2D = block.GetPixelData(0, false);
-
-            // TODO: HERE
-            //foreach (var i in arr)
-            //{
-            //var j = i;
-            //}
-
             byte[] pixels1D = new byte[pixels2D.Length];
             Buffer.BlockCopy(pixels2D, 0, pixels1D, 0, pixels2D.Length);
 

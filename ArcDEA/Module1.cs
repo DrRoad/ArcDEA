@@ -38,7 +38,6 @@ namespace ArcDEA
         /// <returns>False to prevent Pro from closing, otherwise True</returns>
         protected override bool CanUnload()
         {
-            //TODO - add your business logic
             //return false to ~cancel~ Application close
             return true;
         }

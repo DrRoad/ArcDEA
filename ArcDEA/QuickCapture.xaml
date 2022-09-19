@@ -6,7 +6,7 @@
              xmlns:ui="clr-namespace:ArcDEA"
              xmlns:extensions="clr-namespace:ArcGIS.Desktop.Extensions;assembly=ArcGIS.Desktop.Extensions"
              mc:Ignorable="d" 
-             d:DesignHeight="550" d:DesignWidth="300"
+             d:DesignHeight="750" d:DesignWidth="300"
              d:DataContext="{Binding Path=ui.QuickCaptureViewModel}">
   <UserControl.Resources>
     <ResourceDictionary>
@@ -28,31 +28,30 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Dockpanel heading-->
+        <!-- Dockpanel heading -->
         <DockPanel Grid.Row="0" 
                    Height="30" 
+                   Margin="5,0,0,0"
                    LastChildFill="true" 
                    KeyboardNavigation.TabNavigation="Local" >
-            <TextBlock Grid.Column="1" 
-                       Text="{Binding Heading}" 
-                       Style="{DynamicResource Esri_TextBlockDockPaneHeader}">
-                <TextBlock.ToolTip>
-                    <WrapPanel Orientation="Vertical" MaxWidth="300">
-                        <TextBlock Text="{Binding Heading}" TextWrapping="Wrap"/>
-                    </WrapPanel>
-                </TextBlock.ToolTip>
-            </TextBlock>
+            
+            <!--new-->
+            <ListBox x:Name="primaryNavigator" 
+                     VerticalAlignment="Top"
+                     Style="{DynamicResource Esri_ListBoxPanelIndicator}"
+                     ItemsSource="{Binding PrimaryMenuList}" 
+                     SelectedIndex="{Binding SelectedPanelHeaderIndex, Mode=TwoWay}"
+                     IsSynchronizedWithCurrentItem="True"/>
         </DockPanel>
 
-        <!-- Query area controls-->
+        <!-- Query area controls -->
         <StackPanel Grid.Row="1" 
-                    Margin="10" 
-                    Background="Transparent">
+                    Margin="5">
 
             <!-- Query area heading-->
             <TextBlock Name="TxbQueryAreaHeading" 
-                       Margin="0,0,0,5" 
-                       Style="{DynamicResource Esri_TextBlockRegular}"
+                       Margin="0,0,0,2" 
+                       Style="{DynamicResource Esri_TextBlockH3}"
                        Text="Query Area">
             </TextBlock>
 
@@ -79,24 +78,25 @@
                         Grid.Column="1" 
                         Width="20"
                         Height="20"
-                        Margin="0,0,0,0" 
-                        Background="Transparent"
                         BorderBrush="Transparent"
                         Command="{Binding CmdDrawQueryArea}"
                         ToolTip="Draw new query area">
-                    <Image Source="Images\DrawNewQueryArea16.png" Width="16" Height="16"></Image>
+                    <Image Source="pack://application:,,,/ArcDEA;component/Images/DrawNewQueryArea16.png" 
+                           Width="16" 
+                           Height="16">
+                    </Image>
                 </Button>
             </Grid>
         </StackPanel>
 
-        <!-- Dates controls-->
+        <!-- Dates controls -->
         <StackPanel Grid.Row="2" 
-                    Margin="10" 
-                    Background="Transparent">
+                    Margin="5">
 
             <!-- Dates heading-->
-            <TextBlock Name="TxbDatesHeading" Margin="0,0,0,5" 
-                       Style="{DynamicResource Esri_TextBlockRegular}"
+            <TextBlock Name="TxbDatesHeading" 
+                       Margin="0,0,0,2" 
+                       Style="{DynamicResource Esri_TextBlockH3}"
                        Text="Date Range">
             </TextBlock>
 
@@ -106,22 +106,25 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="3*"/>
+                    <ColumnDefinition Width="5*"/>
                     <ColumnDefinition Width="1*"/>
-                    <ColumnDefinition Width="3*"/>
+                    <ColumnDefinition Width="5*"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- Start date combobox-->
                 <DatePicker Name="DateSetStartDate" 
                             Grid.Column="0"  
-                            Margin="0,0,10,0"
                             SelectedDate="{Binding QueryStartDate}">
+                    <DatePicker.Resources>
+                        <Style TargetType="DatePickerTextBox">
+                            <Setter Property="VerticalAlignment" Value="Center" />
+                        </Style>
+                    </DatePicker.Resources>
                 </DatePicker>
 
                 <!-- Dates seperator-->
                 <TextBlock Name="TxbDatesSeperator" 
                            Grid.Column="1" 
-                           Margin="0,0,0,0" 
                            VerticalAlignment="Center" 
                            HorizontalAlignment="Center"
                            Style="{DynamicResource Esri_TextBlockRegular}"
@@ -131,34 +134,37 @@
                 <!-- End date combobox-->
                 <DatePicker Name="DateSetEndDate" 
                             Grid.Column="2"  
-                            Margin="10,0,0,0"
                             SelectedDate="{Binding QueryEndDate}">
+                    <DatePicker.Resources>
+                        <Style TargetType="DatePickerTextBox">
+                            <Setter Property="VerticalAlignment" Value="Center" />
+                        </Style>
+                    </DatePicker.Resources>
                 </DatePicker>
             </Grid>
         </StackPanel>
 
-        <!-- Collection controls-->
+        <!-- Collection controls -->
         <StackPanel Grid.Row="3" 
-                    Margin="10" 
-                    Background="Transparent">
+                    Margin="5">
 
             <!-- Collection heading-->
             <TextBlock Name="TxbCollectionHeading" 
-                       Margin="0,0,0,5" 
-                       Style="{DynamicResource Esri_TextBlockRegular}"
+                       Margin="0,0,0,2" 
+                       Style="{DynamicResource Esri_TextBlockH3}"
                        Text="Collection">
             </TextBlock>
 
             <!-- Collection list-->
-            <ListBox Name="LbxCollections" 
-                     Margin="0,0,0,0" 
-                     MinHeight="50"
-                     MaxHeight="150"
+            <ListBox Name="LbxCollections"
+                     MinHeight="60"
+                     MaxHeight="140"
                      SelectionMode="Multiple" 
                      ItemsSource="{Binding QueryCollections}">
+
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="ListBoxItem">
-                        <Setter Property="IsSelected" Value="{Binding IsCollectionSelected}"></Setter>
+                        <Setter Property="IsSelected" Value="{Binding IsCollectionSelected}"/>
                     </Style>
                 </ListBox.ItemContainerStyle>
 
@@ -167,25 +173,41 @@
                         <StackPanel Orientation="Horizontal">
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="115"/>
-                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                             
+                                <!-- Collection item checkbox -->
                                 <CheckBox Grid.Column="0" 
                                           Content="{Binding CleanName}" 
                                           IsChecked="{Binding IsSelected, Mode=OneWay, RelativeSource={RelativeSource AncestorType=ListBoxItem, Mode=FindAncestor}}"
                                           Focusable="False"
                                           IsHitTestVisible="False"/>
 
-                                <TextBlock Grid.Column="1" Text="{Binding RawName, StringFormat='({0})'}"/>
+                                <!-- Collection item checkbox -->
+                                <TextBlock Grid.Column="1" 
+                                           Text="{Binding RawName, StringFormat='({0})'}"/>
                             </Grid>
                         </StackPanel>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
+        
+            <!-- SLC -->
+            <CheckBox Name="CbxIncludeSlcOff"
+                      Margin="6,5,0,0"
+                      Content="Include SLC-off data"
+                      Focusable="False"
+                      IsHitTestVisible="True"
+                      IsChecked="{Binding QueryIncludeSlcOff}">
+            </CheckBox>
+            
+            <!-- Provisional -->
+            <!-- TODO -->
+        
         </StackPanel>
 
-        <!-- Assets controls-->
+        <!-- Assets tab controls -->
         <StackPanel Grid.Row="4" 
                     Margin="10" 
                     Background="Transparent">
@@ -196,68 +218,174 @@
                        Text="Assets">
             </TextBlock>
 
-            <!-- Assets combobox-->
-            <ListBox Name="LbxAssets" 
+            <!-- Asset tab control-->
+            <TabControl Grid.Row="4"
+                        MinHeight="100"
+                        MaxHeight="300"
+                        SelectedIndex="{Binding SelectedAssetTabIndex}">
+
+                <!-- Raw Assets Tab and Listbox -->
+                <TabItem Header="Raw">
+                    
+                    <ListBox Name="LbxRawAssets" 
                      Margin="0,0,0,0" 
                      MinHeight="50"
                      MaxHeight="150"
                      SelectionMode="Multiple" 
-                     ItemsSource="{Binding QueryAssets}">
-                
-                <ListBox.ItemContainerStyle>
-                    <Style TargetType="ListBoxItem">
-                        <Setter Property="IsSelected" Value="{Binding IsAssetSelected}"></Setter>
-                    </Style>
-                </ListBox.ItemContainerStyle>
+                     ItemsSource="{Binding QueryRawAssets}">
 
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Orientation="Horizontal">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="75"/>
-                                    <ColumnDefinition Width="100"/>
-                                </Grid.ColumnDefinitions>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="IsSelected" Value="{Binding IsRawAssetSelected}"></Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
 
-                                <CheckBox Grid.Column="0" 
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="75"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <CheckBox Grid.Column="0" 
                                           Content="{Binding CleanName}" 
                                           IsChecked="{Binding IsSelected, Mode=OneWay, RelativeSource={RelativeSource AncestorType=ListBoxItem, Mode=FindAncestor}}"
                                           Focusable="False"
                                           IsHitTestVisible="False"/>
 
-                                <TextBlock Grid.Column="1" Text="{Binding RawName, StringFormat='({0})'}"/>
-                            </Grid>
-                        </StackPanel>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
+                                        <TextBlock Grid.Column="1" Text="{Binding RawName, StringFormat='({0})'}"/>
+                                    </Grid>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </TabItem>
 
+                <!-- Index Assets Tab and Listbox -->
+                <TabItem Header="Index">
+                    
+                    <ListBox Name="LbxIndexAssets" 
+                     Margin="0,0,0,0" 
+                     MinHeight="50"
+                     MaxHeight="150"
+                     SelectionMode="Single" 
+                     ItemsSource="{Binding QueryIndexAssets}">
+
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="IsSelected" Value="{Binding IsIndexAssetSelected}"></Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="75"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <CheckBox Grid.Column="0" 
+                                          Content="{Binding ShortName}" 
+                                          IsChecked="{Binding IsSelected, Mode=OneWay, RelativeSource={RelativeSource AncestorType=ListBoxItem, Mode=FindAncestor}}"
+                                          Focusable="False"
+                                          IsHitTestVisible="False"/>
+
+                                        <TextBlock Grid.Column="1" Text="{Binding LongName, StringFormat='({0})'}"/>
+                                    </Grid>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </TabItem>
+
+                <!-- Calculator Assets Tab and Listbox -->
+                <TabItem Header="Calculator">
+                    <Label Content="Create your own indices list..." />
+                </TabItem>
+
+            </TabControl>
         </StackPanel>
 
-        <!-- Cloud cover controls-->
-        <StackPanel Grid.Row="5" 
-                    Margin="10" 
-                    Background="Transparent">
+        <!-- Expander containing mask values, max invalid-->
+        <Expander Grid.Row="5"
+                  Margin="5,5,5,5" 
+                  Header="Quality"
+                  IsExpanded="False"
+                  Background="Transparent">
 
-            <!-- Cloud cover heading-->
-            <TextBlock Name="TxbCloudCoverHeading" 
-                       Margin="0,0,0,5" 
+            <StackPanel Margin="5,0,5,0">
+                
+                <!-- Mask values controls -->
+                <StackPanel Margin="0,5,0,5">
+
+                    <!-- Mask values heading-->
+                    <TextBlock Name="TxbQualityHeading" Margin="0,0,0,5" 
                        Style="{DynamicResource Esri_TextBlockRegular}"
-                       Text="Maximum Cloud Cover">
-            </TextBlock>
+                       Text="Mask Values">
+                    </TextBlock>
 
-            <!-- Slider bar and value grid-->
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="8*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+                    <!-- Mask values list-->
+                    <ListBox Name="LbxMaskValues" 
+                     Margin="0,0,0,0" 
+                     MinHeight="50"
+                     MaxHeight="150"
+                     SelectionMode="Multiple" 
+                     ItemsSource="{Binding QueryMaskValues}">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="IsSelected" Value="{Binding IsMaskValueSelected}"></Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
 
-                <!-- Cloud cover slider-->
-                <Slider Name="SldCloudCover"
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="115"/>
+                                            <ColumnDefinition Width="100"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <CheckBox Grid.Column="0" 
+                                          Content="{Binding Label}" 
+                                          IsChecked="{Binding IsSelected, Mode=OneWay, RelativeSource={RelativeSource AncestorType=ListBoxItem, Mode=FindAncestor}}"
+                                          Focusable="False"
+                                          IsHitTestVisible="False"/>
+
+                                        <TextBlock Grid.Column="1" Text="{Binding Value, StringFormat='({0})'}"/>
+                                    </Grid>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+
+                <!-- Cloud cover controls -->
+                <StackPanel Margin="0,5,0,5">
+
+                    <!-- Cloud cover heading-->
+                    <TextBlock Name="TxbCloudCoverHeading" 
+                       Margin="0,5,0,5" 
+                       Style="{DynamicResource Esri_TextBlockRegular}"
+                       Text="Maximum Invalid">
+                    </TextBlock>
+
+                    <!-- Slider bar and value grid-->
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="8*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Cloud cover slider-->
+                        <Slider Name="SldCloudCover"
                         Grid.Column="0"
                         Margin="0,0,5,0"
                         Minimum="0"
@@ -265,21 +393,25 @@
                         Value="{Binding QueryCloudCover}"
                         TickFrequency="5" 
                         IsSnapToTickEnabled="True">
-                    <!--<ItemContainerStyle="{DynamicResource Esri_ListBoxItemHighlightBrush}" -->
-                </Slider>
+                            <!--<ItemContainerStyle="{DynamicResource Esri_ListBoxItemHighlightBrush}" -->
+                        </Slider>
 
-                <!-- Cloud cover value box-->
-                <TextBlock Name="TxbCloudCoverValue" 
+                        <!-- Cloud cover value box-->
+                        <TextBlock Name="TxbCloudCoverValue" 
                            Grid.Column="1"
                            Margin="5,0,0,0" 
                            Style="{DynamicResource Esri_TextBlockRegular}"
                            Text="{Binding ElementName=SldCloudCover, Path=Value, UpdateSourceTrigger=PropertyChanged, StringFormat={}{0}%}"
                            TextAlignment="Right">
-                </TextBlock>
-            </Grid>
-        </StackPanel>
+                        </TextBlock>
+                    </Grid>
+                </StackPanel>
 
-        <!-- Output folder controls-->
+            </StackPanel>
+
+        </Expander>
+
+        <!-- Output folder controls -->
         <StackPanel Grid.Row="6" 
                     Margin="10" 
                     Background="Transparent">
@@ -325,7 +457,7 @@
             </Grid>
         </StackPanel>
 
-        <!-- Progress bar and run button-->
+        <!-- Progress bar and run controls -->
         <StackPanel Grid.Row="7" 
                     Margin="10" 
                     VerticalAlignment="Bottom"

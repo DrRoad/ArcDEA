@@ -11,6 +11,151 @@ namespace ArcDEA.Classes
 {
     public static class Helpers
     {
+        #region DockPane control data structures
+        /// <summary>
+        /// Class to hold collection information and track selections.
+        /// </summary>
+        public class CollectionItem
+        {
+            public string RawName { get; set; }
+            public string CleanName { get; set; }
+            public bool IsCollectionSelected { get; set; }
+
+            public CollectionItem(string rawName, string cleanName, bool isCollectionSelected)
+            {
+                RawName = rawName;
+                CleanName = cleanName;
+                IsCollectionSelected = isCollectionSelected;
+            }
+        }
+
+        /// <summary>
+        /// Class to hold raw asset information and track selections.
+        /// </summary>
+        public class AssetRawItem
+        {
+            public string RawName { get; set; }
+            public string CleanName { get; set; }
+            public bool IsRawAssetSelected { get; set; }
+
+            public AssetRawItem(string rawName, string cleanName, bool isRawAssetSelected)
+            {
+                RawName = rawName;
+                CleanName = cleanName;
+                IsRawAssetSelected = isRawAssetSelected;
+            }
+        }
+
+        /// <summary>
+        /// Class to hold index asset information and track selection.
+        /// </summary>
+        public class AssetIndexItem
+        {
+            public string ShortName { get; set; }
+            public string LongName { get; set; }
+            public List<string> Bands { get; set; }
+            public bool IsIndexAssetSelected { get; set; }
+
+            public AssetIndexItem(string shortName, string longName, List<string> bands, bool isIndexAssetSelected)
+            {
+                ShortName = shortName;
+                LongName = longName;
+                Bands = bands;
+                IsIndexAssetSelected = isIndexAssetSelected;
+            }
+        }
+
+        /// <summary>
+        /// Class to hold quality fmask values and track selection.
+        /// </summary>
+        public class MaskValueItem
+        {
+            public string Label { get; set; }
+            public int Value { get; set; }
+            public bool IsMaskValueSelected { get; set; }
+            
+            public MaskValueItem(string label, int value, bool isMaskValueSelected)
+            {
+                Label = label;
+                Value = value;
+                IsMaskValueSelected = isMaskValueSelected;
+            }
+        }
+        #endregion
+
+        #region DockPane control populators
+        /// <summary>
+        /// Populate collection list items on DockPane UI control.
+        /// </summary>
+        public static List<CollectionItem> PopulateCollectionItems()
+        {
+            List<CollectionItem> items = new List<CollectionItem>()
+            {
+                { new CollectionItem("ga_ls5t_ard_3", "Landsat 5 TM", false) },
+                { new CollectionItem("ga_ls7e_ard_3", "Landsat 7 ETM+", false) },
+                { new CollectionItem("ga_ls8c_ard_3", "Landsat 8 OLI", true) }
+            };
+
+            return items;
+        }
+
+        /// <summary>
+        /// Populate raw-based asset list items on DockPane UI control.
+        /// </summary>
+        public static List<AssetRawItem> PopulateRawAssetItems()
+        {
+            List<AssetRawItem> items = new List<AssetRawItem>()
+            {
+                { new AssetRawItem("nbart_blue",   "Blue",   false) },
+                { new AssetRawItem("nbart_green",  "Green",  false) },
+                { new AssetRawItem("nbart_red",    "Red",    false) },
+                { new AssetRawItem("nbart_nir",    "NIR",    false) },
+                { new AssetRawItem("nbart_swir_1", "SWIR 1", false) },
+                { new AssetRawItem("nbart_swir_2", "SWIR 2", false) }
+            };
+
+            return items;
+
+        }
+
+        /// <summary>
+        /// Populate index-based asset list items on DockPane UI control.
+        /// </summary>
+        public static List<AssetIndexItem> PopulateIndexAssetItems()
+        {
+            List<AssetIndexItem> items = new List<AssetIndexItem>()
+            {
+                { new AssetIndexItem("NDVI", "Normalised Difference Vegetation Index", new List<string> { "nbart_red", "nbart_nir" }, false) },
+                { new AssetIndexItem("SLAVI", "Specific Leaf Area Vegetation Index", new List<string> { "nbart_red", "nbart_nir", "nbart_swir_2" }, false) }
+            };
+
+            return items;
+
+        }
+
+        /// <summary>
+        /// Populate mask value list items on DockPane UI control.
+        /// </summary>
+        public static List<MaskValueItem> PopulateMaskValueItems()
+        {
+            List<MaskValueItem> items = new List<MaskValueItem>()
+            {
+                { new MaskValueItem("Unclassified", 0, false) },
+                { new MaskValueItem("Clear", 1, true) },
+                { new MaskValueItem("Cloud", 2, false) },
+                { new MaskValueItem("Cloud Shadow", 3, false) },
+                { new MaskValueItem("Snow", 4, true) },
+                { new MaskValueItem("Water", 5, true) },
+            };
+
+            return items;
+
+        }
+        #endregion
+
+        /// <summary>
+        /// Extract bounding box from a graphics layer and project to EPSG code.
+        /// </summary>
         public static async Task<double[]> GraphicToBoundingBoxAsync(GraphicsLayer layer, int epsg)
         {
             // TODO: check epsg is not null

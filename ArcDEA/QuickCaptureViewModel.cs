@@ -1,39 +1,26 @@
-﻿using ArcGIS.Core.CIM;
-using ArcGIS.Core.Data;
-using ArcGIS.Core.Geometry;
-using ArcGIS.Desktop.Catalog;
+﻿using ArcGIS.Desktop.Catalog;
 using ArcGIS.Desktop.Core;
-using ArcGIS.Desktop.Editing;
-using ArcGIS.Desktop.Extensions;
 using ArcGIS.Desktop.Framework;
 using ArcGIS.Desktop.Framework.Contracts;
-using ArcGIS.Desktop.Framework.Dialogs;
 using ArcGIS.Desktop.Framework.Threading.Tasks;
-using ArcGIS.Desktop.Layouts;
 using ArcGIS.Desktop.Mapping;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Collections.ObjectModel;
 using ArcGIS.Desktop.Mapping.Events;
 using ArcDEA.Classes;
-using System.Threading;
-using System.Windows.Threading;
 using System.Net.Http;
 using System.IO;
-using ArcGIS.Core.Data.Raster;
-using System.Collections.Concurrent;
-using System.Diagnostics;
+using ArcGIS.Desktop.Framework.Controls;
 
 namespace ArcDEA
 {
     internal class QuickCaptureViewModel : DockPane
     {
-
         private const string _dockPaneID = "ArcDEA_QuickCapture";
 
         #region Collections synchronisation
@@ -41,11 +28,18 @@ namespace ArcDEA
         /// Enable collections synchronisation.
         /// </summary>
         private static readonly object _lockQueryAreaLayers = new object();
-        private static readonly object _lockQueryCollections = new object();
+        //private static readonly object _lockQueryCollections = new object();
         protected QuickCaptureViewModel()
         {
             BindingOperations.EnableCollectionSynchronization(QueryAreaLayers, _lockQueryAreaLayers);
             //BindingOperations.EnableCollectionSynchronization(QueryCollections, _lockQueryCollections);
+
+            // TODO: do all your populate list functions here
+            // its how esri do it
+
+            // Initialise dockpanel tabs
+            PrimaryMenuList.Add(new TabControl() { Text = "Landsat", Tooltip = "Landsat Products" });
+            PrimaryMenuList.Add(new TabControl() { Text = "Sentinel", Tooltip = "Sentinel Products" });
         }
         #endregion
 
@@ -75,16 +69,39 @@ namespace ArcDEA
             });
         }
 
-        #region Heading controls
-        /// <summary>
-        /// Temporary text heading on DockPane.
-        /// </summary>
-        private string _heading = "Temporary";
-        public string Heading
+        #region tabs (to be finished)
+        // TODO: finish this
+        // https://github.com/Esri/arcgis-pro-sdk-community-samples/tree/master/Framework/CustomCatalog
+        // DockPanel with header and a stackpanel binding to panel1, panel2
+        // in dockpanel with header vm, set current page to panel based on tab clicked
+        // panels are defined in a folder seperately as one xaml and cs each.
+        private List<TabControl> _primaryMenuList = new List<TabControl>();
+        public List<TabControl> PrimaryMenuList
         {
-            get { return _heading; }
-            set { SetProperty(ref _heading, value, () => Heading); }
+            get { return _primaryMenuList; }
         }
+        private int _selectedPanelHeaderIndex = 0;
+        public int SelectedPanelHeaderIndex
+        {
+            get { return _selectedPanelHeaderIndex; }
+            set
+            {
+                SetProperty(ref _selectedPanelHeaderIndex, value, () => SelectedPanelHeaderIndex);
+                //if (_selectedPanelHeaderIndex == 0)
+                    //CurrentPage = _paneH1VM;
+                //if (_selectedPanelHeaderIndex == 1)
+                    //CurrentPage = _paneH2VM;
+            }
+        }
+        //private PanelViewModelBase _currentPage;
+        //public PanelViewModelBase CurrentPage
+        //{
+        //    get { return _currentPage; }
+        //    set
+        //    {
+        //        SetProperty(ref _currentPage, value, () => CurrentPage);
+        //    }
+        //}
         #endregion
 
         #region QueryArea controls
@@ -223,29 +240,10 @@ namespace ArcDEA
 
         #region QueryCollection controls
         /// <summary>
-        /// Item to hold collection information and selections.
-        /// </summary>
-        public class CollectionItem
-        {
-            public string RawName { get; set; }
-            public string CleanName { get; set; }
-            public bool IsCollectionSelected { get; set; }
-
-            public CollectionItem(string rawName, string cleanName, bool isCollectionSelected)
-            {
-                RawName = rawName;
-                CleanName = cleanName;
-                IsCollectionSelected = isCollectionSelected;
-            }
-        }
-
-        /// <summary>
         /// List of available DEA data collections.
         /// </summary>
-        private List<CollectionItem> _queryCollections = new List<CollectionItem>() { new CollectionItem("ga_ls5t_ard_3", "Landsat 5 TM", false),
-                                                                                      new CollectionItem("ga_ls7e_ard_3", "Landsat 7 ETM+", false),
-                                                                                      new CollectionItem("ga_ls8c_ard_3", "Landsat 8 OLI", false) };
-        public List<CollectionItem> QueryCollections
+        private List<Helpers.CollectionItem> _queryCollections = Helpers.PopulateCollectionItems();
+        public List<Helpers.CollectionItem> QueryCollections
         {
             get { return _queryCollections; }
             set { SetProperty(ref _queryCollections, value, () => QueryCollections); }
@@ -261,53 +259,97 @@ namespace ArcDEA
             get { return _isCollectionSelected; }
             set { SetProperty(ref _isCollectionSelected, value, () => IsCollectionSelected); }
         }
+
+        /// <summary>
+        /// Tracks whether user has requested slc-off data or not.
+        /// </summary>
+        private bool _queryIncludeSlcOff = false;
+        public bool QueryIncludeSlcOff
+        {
+            get { return _queryIncludeSlcOff; }
+            set { SetProperty(ref _queryIncludeSlcOff, value, () => QueryIncludeSlcOff); }
+        }
         #endregion
 
         #region QueryAsset controls
         /// <summary>
-        /// Item to hold asset information and selections.
+        /// Value of currently selected tab control index.
         /// </summary>
-        public class AssetItem
+        private int _selectedAssetTabIndex = 0;
+        public int SelectedAssetTabIndex
         {
-            public string RawName { get; set; }
-            public string CleanName { get; set; }
-            public bool IsAssetSelected { get; set; }
-
-            public AssetItem(string rawName, string cleanName, bool isAssetSelected)
-            {
-                RawName = rawName;
-                CleanName = cleanName;
-                IsAssetSelected = isAssetSelected;
-            }
+            get { return _selectedAssetTabIndex; }
+            set { SetProperty(ref _selectedAssetTabIndex, value, () => SelectedAssetTabIndex); }
         }
 
         /// <summary>
-        /// List of available assets (i.e., bands) for current DEA data collection.
+        /// List of available raw assets (i.e., bands) for current DEA data collection.
         /// </summary>
-        private List<AssetItem> _queryAssets = new List<AssetItem>() { new AssetItem("nbart_blue",   "Blue",   false),
-                                                                       new AssetItem("nbart_green",  "Green",  false),
-                                                                       new AssetItem("nbart_red",    "Red",    false),
-                                                                       new AssetItem("nbart_nir",    "NIR",    false),
-                                                                       new AssetItem("nbart_swir_1", "SWIR 1", false),
-                                                                       new AssetItem("nbart_swir_2", "SWIR 2", false)};
-        public List<AssetItem> QueryAssets
+        private List<Helpers.AssetRawItem> _queryRawAssets = Helpers.PopulateRawAssetItems();
+        public List<Helpers.AssetRawItem> QueryRawAssets
         {
-            get { return _queryAssets; }
-            set { SetProperty(ref _queryAssets, value, () => QueryAssets); }
+            get { return _queryRawAssets; }
+            set { SetProperty(ref _queryRawAssets, value, () => QueryRawAssets); }
         }
 
         /// <summary>
-        /// Tracks AssetItems that have been selected in listbox. Binds
-        /// ListItem IsSelected to AssetItem IsAssetSelected property.
+        /// Tracks AssetRawItems that have been selected in listbox. Binds
+        /// ListItem IsSelected to AssetItem IsRawAssetSelected property.
         /// </summary>
-        private bool _isAssetSelected;
-        public bool IsAssetSelected
+        private bool _isRawAssetSelected;
+        public bool IsRawAssetSelected
         {
-            get { return _isAssetSelected; }
-            set { SetProperty(ref _isAssetSelected, value, () => IsAssetSelected); }
+            get { return _isRawAssetSelected; }
+            set { SetProperty(ref _isRawAssetSelected, value, () => IsRawAssetSelected); }
+        }
+
+        /// <summary>
+        /// List of available index assets (i.e., bands) that users can generate.
+        /// </summary>
+        private List<Helpers.AssetIndexItem> _queryIndexAssets = Helpers.PopulateIndexAssetItems();
+        public List<Helpers.AssetIndexItem> QueryIndexAssets
+        {
+            get { return _queryIndexAssets; }
+            set { SetProperty(ref _queryIndexAssets, value, () => QueryIndexAssets); }
+        }
+
+        /// <summary>
+        /// Tracks AssetIndexItems that have been selected in listbox. Binds
+        /// ListItem IsSelected to AssetItem IsIndexAssetSelected property.
+        /// </summary>
+        private bool _isIndexAssetSelected;
+        public bool IsIndexAssetSelected
+        {
+            get { return _isIndexAssetSelected; }
+            set { SetProperty(ref _isIndexAssetSelected, value, () => IsIndexAssetSelected); }
         }
         #endregion
 
+        #region QueryMaskValues controls
+        // TODO: rethink name for maskvalues
+        /// <summary>
+        /// List of available quality fmask values for current DEA data collection.
+        /// </summary>
+        private List<Helpers.MaskValueItem> _queryMaskValues = Helpers.PopulateMaskValueItems();
+        public List<Helpers.MaskValueItem> QueryMaskValues
+        {
+            get { return _queryMaskValues; }
+            set { SetProperty(ref _queryMaskValues, value, () => QueryMaskValues); }
+        }
+
+        /// <summary>
+        /// Tracks MaskValueItem that have been selected in listbox. Binds
+        /// ListItem IsSelected to AssetItem IsMaskValueSelected property.
+        /// </summary>
+        private bool _isMaskValueSelected;
+        public bool IsMaskValueSelected
+        {
+            get { return _isMaskValueSelected; }
+            set { SetProperty(ref _isMaskValueSelected, value, () => IsMaskValueSelected); }
+        }
+        #endregion
+
+        // TODO: set this to QueryInvalidPercent
         #region QueryCloud controls
         /// <summary>
         /// Percentage cloud cover slider control.
@@ -452,6 +494,7 @@ namespace ArcDEA
                 {
                     #region General initialisation
                     // Set that process is running
+                    // TODO: setup processing switch
                     //IsProcessing = true;
 
                     // Set progressor
@@ -466,8 +509,10 @@ namespace ArcDEA
                     OSGeo.GDAL.Gdal.SetConfigOption("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR");
                     OSGeo.GDAL.Gdal.SetConfigOption("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", "tif");
                     OSGeo.GDAL.Gdal.SetConfigOption("VSI_CACHE", "TRUE");
+                    OSGeo.GDAL.Gdal.SetConfigOption("VSI_CACHE_SIZE ", Math.Pow(10, 9).ToString());
                     OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_MULTIRANGE", "YES");
                     OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_MERGE_CONSECUTIVE_RANGES", "YES");
+                    OSGeo.GDAL.Gdal.SetConfigOption("AWS_NO_SIGN_REQUEST", "YES");
 
                     // Get the ArcGIS temporary folder path
                     string tmpFolder = Path.GetTempPath();
@@ -505,33 +550,41 @@ namespace ArcDEA
                         return;
                     }
 
-                    // Get selected asset(s) and ensure oa_fmask band is included
+                    // Get selected asset(s) based on currently selected asset tab
                     var assets = new List<string>();
-                    string assetType = "index";  // TODO: take this from ui: raw, index, calculator
-                    if (assetType == "raw")
+                    if (SelectedAssetTabIndex == 0)
                     {
-                        assets = QueryAssets.Where(e => e.IsAssetSelected).Select(e => e.RawName).ToList();
-                        if (assets.Count == 0)
-                        {
-                            return;
-                        }
+                        assets = QueryRawAssets.Where(e => e.IsRawAssetSelected).Select(e => e.RawName).ToList();
                     }
-                    else if (assetType == "index")
+                    else if (SelectedAssetTabIndex == 1)
                     {
-                        // TODO: send this to asset get
-                        //list of assets GetAssetsForIndex(indexName)
-                        assets = new List<string>() { "nbart_red", "nbart_nir" };
+                        assets = QueryIndexAssets.Where(e => e.IsIndexAssetSelected).Select(e => e.Bands).FirstOrDefault();
+                    }
+                    else if (SelectedAssetTabIndex == 2)
+                    {
+                        // TODO: calculator
                     }
 
                     // Ensure we have a QA mask band at the end
-                    if (!assets.Contains("oa_fmask"))
+                    if (assets.Count == 0)
+                    {
+                        return;
+                    }
+                    else if (!assets.Contains("oa_fmask"))
                     {
                         assets.Add("oa_fmask");
                     }
 
                     // Setup valid classes and minimum valid pixels
-                    // TODO: make dynamic add to UI
-                    List<int> validPixels = new List<int> { 1, 4, 5 };
+                    List<int> validPixels = QueryMaskValues.Where(e => e.IsMaskValueSelected).Select(e => e.Value).ToList();
+
+                    // Ensure we have a at least one valid pixel value
+                    if (validPixels.Count == 0)
+                    {
+                        return;
+                    }
+
+                    // Get minimum valid percentage based on max invalid
                     float minValid = Convert.ToSingle(1.0 - (QueryCloudCover / 100));
 
                     // Setup nodata value
@@ -572,13 +625,21 @@ namespace ArcDEA
                         return;
                     }
 
-                    // Convert STAC to download structure, sort by datetime, group dates by solar day
+                    // Convert STAC to download structure
                     var items = Data.ConvertStacToDownloads(root, assets, bboxAlbers);
+
+                    // Remove Landsat 7 data where SLC-off if requested
+                    if (QueryIncludeSlcOff == false)
+                    {
+                        items = Data.RemoveSlcOffData(items);
+                    }
+
+                    // Sort by datetime, group dates by solar day
                     items = Data.SortByDateTime(items);
                     items = Data.GroupBySolarDay(items);
                     #endregion
 
-                    #region Stream and assess fmask data
+                    #region Download and assess fmask data
                     // Set progressor
                     RefreshProgressBar(1, items.Count, "Downloading and assessing fmask data...", false);
 
@@ -609,10 +670,21 @@ namespace ArcDEA
                     i = 0;
                     await QueuedTask.Run(() => Parallel.ForEachAsync(items, numCores, async (item, token) =>
                     {
-                        // Download full geotiff, set invalid pixels to nodata, save to folder
-                        //await item.DownloadAndProcessViaFullAsync(outputFolder, validPixels, noDataValue, client);
-                        string index = "ndvi";
-                        await item.DownloadAndProcessViaIndexAsync(index, outputFolder, validPixels, noDataValue, client);
+                        if (SelectedAssetTabIndex == 0)
+                        {
+                            // Download raw raster bands requested by user
+                            await item.DownloadAndProcessViaFullAsync(outputFolder, validPixels, noDataValue, client);
+                        }
+                        else if (SelectedAssetTabIndex == 1)
+                        {
+                            // Download and process raster bands into index requested by user
+                            string index = QueryIndexAssets.Where(e => e.IsIndexAssetSelected).Select(e => e.ShortName).FirstOrDefault();
+                            await item.DownloadAndProcessViaIndexAsync(index, outputFolder, validPixels, noDataValue, client);
+                        }
+                        else if (SelectedAssetTabIndex == 2)
+                        {
+                            // TODO: calculator
+                        }
 
                         // Increment progress
                         i = i + 1;

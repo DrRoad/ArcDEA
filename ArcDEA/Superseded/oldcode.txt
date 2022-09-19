@@ -308,3 +308,165 @@ return;
 //    }
 //}));
 //#endregion
+
+
+//
+var roots = root.Features.Select(e => e.Assets["nbart_red"].Href).ToList();
+MaxProgressValue = roots.Count;
+int j = 0;
+await QueuedTask.Run(() => Parallel.ForEachAsync(roots, numCores, async (item, token) =>
+{
+    await Task.Run(() => { 
+        Debug.WriteLine($"Working on {item}");
+
+        string url = item.Remove(0, 5);
+        url = "/vsis3_streaming/" + url;
+
+        var watch = new Stopwatch();
+        watch.Start();
+
+        OSGeo.GDAL.Dataset dataset = OSGeo.GDAL.Gdal.Open(url, OSGeo.GDAL.Access.GA_ReadOnly);
+        OSGeo.GDAL.Band band = dataset.GetRasterBand(1);
+
+        int width = band.XSize;
+        int height = band.YSize;
+        int size = width * height;
+
+        // Read pixel values into "block" array
+        Int16[] bits = new Int16[size];
+        band.ReadRaster(0, 0, width, height, bits, width, height, 0, 0);
+
+        watch.Stop();
+        var duration = watch.Elapsed;
+
+        Debug.WriteLine($"Took: {duration.ToString()}");
+    });
+
+    // Increment progress 
+    j = j + 1;
+    if (j % 5 == 0)
+    {
+        progressValue.Report(j);
+        progressPercent.Report($"{Convert.ToInt32(j / MaxProgressValue * 100)}%");
+    }
+}));
+
+public async Task<int> DownloadMaskAsync(string folder, HttpClient client)
+{
+    // Put this in viewmodel end
+    //await QueuedTask.Run(async () =>
+    //{
+    //    List<Task<int>> masks = items.Select(e => e.DownloadMaskAsync(tmpFolder, client)).ToList();
+    //    while (masks.Any())
+    //    {
+    //        // Get next task when available
+    //        Task<int> finished = await Task.WhenAny(masks);
+    //        masks.Remove(finished);
+
+    //        // Download mask geotiff
+    //        i += await finished;
+
+    //        // Increment progressor
+    //        await Task.Delay(100);
+    //        progressValue.Report(i);
+    //        progressPercent.Report($"({Math.Round(i / MaxProgressValue * 100, 2)}%)");
+    //    }
+    //});
+
+    string filepath = Path.Join(folder, MaskFilename);
+
+    using (var response = await client.GetAsync(MaskWcsUrl))
+    {
+        response.EnsureSuccessStatusCode();
+
+        using (FileStream fs = new FileStream(filepath, FileMode.CreateNew))
+        {
+            await response.Content.CopyToAsync(fs);
+            return 1;
+        }
+    };
+}
+
+public async Task<int> DownloadFullAsync(string folder, HttpClient client)
+{
+    // Put this in viewmodel
+    //i = 0;
+    //await QueuedTask.Run(async () =>
+    //{
+    //    List<Task<int>> fulls = items.Select(e => e.DownloadFullAsync(tmpFolder, client)).ToList();
+    //    while (fulls.Any())
+    //    {
+    //        // Get next task when available
+    //        Task<int> finish = await Task.WhenAny(fulls);
+    //        fulls.Remove(finish);
+
+    //        // Download full geotiff task
+    //        i += await finish;
+
+    //        // Increment progressor
+    //        await Task.Delay(100);
+    //        progressValue.Report(i);
+    //        progressPercent.Report($"({Math.Round(i / MaxProgressValue * 100, 2)}%)");
+    //    }
+    //});
+
+    string filepath = Path.Join(folder, FullFilename);
+
+    using (var response = await client.GetAsync(FullWcsUrl))
+    {
+        response.EnsureSuccessStatusCode();
+
+        using (FileStream fs = new FileStream(filepath, FileMode.CreateNew))
+        {
+            await response.Content.CopyToAsync(fs);
+            return 1;
+        }
+    };
+}
+
+public async Task Test(string index, string outputFolder, List<int> validPixels, Int16 noDataValue, HttpClient client)
+{
+    await Task.Run(() =>
+    {
+        try
+        {
+            // Create full output path and filename
+            //string outputFile = Path.Combine(outputFolder, FinalFilename);
+
+            // Download and read WCS full source raster (including mask band)
+            //OSGeo.GDAL.Dataset sourceDS = OSGeo.GDAL.Gdal.Open(FullWcsUrl, OSGeo.GDAL.Access.GA_ReadOnly);
+
+            //OSGeo.GDAL.Driver driver = OSGeo.GDAL.Gdal.GetDriverByName("VRT");
+
+            //OSGeo.GDAL.Dataset dataset = OSGeo.GDAL.Gdal.OpenShared(FullWcsUrl, OSGeo.GDAL.Access.GA_ReadOnly);
+
+            //OSGeo.GDAL.Dataset vrt = driver.CreateCopy(@"C:\Users\262272G\Desktop\out.vrt", dataset, 0, null, null, null);
+
+            //OSGeo.GDAL.Dataset vrt = driver.CreateCopy("", dataset, 0, null, null, null);
+            //string xmlvrt = vrt.GetMetadata("xml:VRT")[0];
+
+            //OSGeo.GDAL.Dataset vrt = driver.CreateCopy("", dataset, 0, null, null, null);
+            //vrt.SetMetadataItem("SourceDate", "July 21, 2003", "");
+            //vrt.GetRasterBand(1)->SetMetadataItem("HideNoDataValue", "1", "");
+            //vrt.GetRasterBand(1).SetNoDataValue(-999.0);
+            //OSGeo.GDAL.Driver geoTiffdriver = OSGeo.GDAL.Gdal.GetDriverByName("GTiff");
+            //OSGeo.GDAL.Dataset geoTiffdataset = geoTiffdriver.CreateCopy("vrt.tif", vrt, 0, null, null, null);
+            //geoTiffdataset.FlushCache();
+            //geoTiffdataset.Dispose();
+
+            //OSGeo.GDAL.Dataset vrt = driver.CreateCopy("", dataset, 0, null, null, null);
+            //vrt.AddBand(OSGeo.GDAL.DataType.GDT_CFloat32, null);
+
+
+            int z = 0;
+
+        }
+        catch (Exception ex)
+        {
+            int t = 0;
+        }
+
+        // Take a breath...
+        Task.Delay(100);
+    });
+}

@@ -185,5 +185,43 @@ namespace ArcDEA.Classes
 
             return bbox;
         }
+    
+        //
+        public static double[] ReprojectBoundingBox(double[] inBoundingBox, int inEpsg, int outEpsg)
+        {
+            // Check bounding box
+            if (inBoundingBox == null)
+            {
+                return null;
+            }
+
+            // Unpack bbox coordinates
+            double minY = inBoundingBox[0];
+            double minX = inBoundingBox[1];
+            double maxY = inBoundingBox[2];
+            double maxX = inBoundingBox[3];
+
+            // Check epsg parameters
+            if (inEpsg == null || outEpsg == null) {
+                return null;
+            }
+
+            // Set input bbox epsg
+            OSGeo.OSR.SpatialReference inSrs = new OSGeo.OSR.SpatialReference(null);
+            inSrs.ImportFromEPSG(inEpsg);
+
+            // Set output bbox epsg
+            OSGeo.OSR.SpatialReference outSrs = new OSGeo.OSR.SpatialReference(null);
+            outSrs.ImportFromEPSG(outEpsg);
+
+            // Initialise transformer
+            OSGeo.OSR.CoordinateTransformation transformer = new OSGeo.OSR.CoordinateTransformation(inSrs, outSrs);
+
+            // Initialise output bbox and project coordinates to output
+            double[] outBoundingBox = new double[4] { 0, 0, 0, 0 };
+            transformer.TransformBounds(outBoundingBox, minX, minY, maxX, maxY, 0);
+
+            return outBoundingBox;
+        }
     }
 }

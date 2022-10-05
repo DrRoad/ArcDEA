@@ -506,19 +506,24 @@ namespace ArcDEA
                     // Register GDAL and set config options
                     OSGeo.GDAL.Gdal.AllRegister();
                     OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_UNSAFESSL", "YES");
-                    OSGeo.GDAL.Gdal.SetConfigOption("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR");
+                    //OSGeo.GDAL.Gdal.SetConfigOption("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR");
                     OSGeo.GDAL.Gdal.SetConfigOption("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", "tif");
-                    OSGeo.GDAL.Gdal.SetConfigOption("VSI_CACHE", "TRUE");
-                    OSGeo.GDAL.Gdal.SetConfigOption("VSI_CACHE_SIZE ", Math.Pow(10, 9).ToString());
+                    //OSGeo.GDAL.Gdal.SetConfigOption("VSI_CACHE", "TRUE");
+                    //OSGeo.GDAL.Gdal.SetConfigOption("VSI_CACHE_SIZE ", Math.Pow(10, 9).ToString());
                     OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_MULTIRANGE", "YES");
                     OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_MERGE_CONSECUTIVE_RANGES", "YES");
-                    OSGeo.GDAL.Gdal.SetConfigOption("AWS_NO_SIGN_REQUEST", "YES");
+                    //OSGeo.GDAL.Gdal.SetConfigOption("AWS_NO_SIGN_REQUEST", "YES");
+
+                    // Register OSR and set config options
+                    OSGeo.OGR.Ogr.RegisterAll();
 
                     // Get the ArcGIS temporary folder path
                     string tmpFolder = Path.GetTempPath();
 
                     // Set download and processing num cores
-                    var numCores = new ParallelOptions { MaxDegreeOfParallelism = 15 };  // TODO: make this dynamic
+                    int availableCores = Environment.ProcessorCount - 1;
+                    var numCores = new ParallelOptions { MaxDegreeOfParallelism = availableCores };
+                    System.Diagnostics.Debug.WriteLine($"Using {availableCores} cores.");
 
                     // Open a HTTP client with 30 minute timeout
                     var client = new HttpClient();
@@ -526,26 +531,20 @@ namespace ArcDEA
                     #endregion
 
                     #region Get and check parameters from UI
-                    // Get bounding box of graphic in wgs84 and albers
-                    double[] bboxWgs84;
-                    double[] bboxAlbers;
-                    if (SelectedQueryAreaLayer != null)
-                    {
-                        bboxWgs84 = await Helpers.GraphicToBoundingBoxAsync(SelectedQueryAreaLayer, 4326);
-                        bboxAlbers = await Helpers.GraphicToBoundingBoxAsync(SelectedQueryAreaLayer, 3577);
-                    }
-                    else
+                    // Get bounding box of graphic (in wgs84)
+                    if (SelectedQueryAreaLayer == null)
                     {
                         return;
                     }
+                    double[] inBoundingBox = await Helpers.GraphicToBoundingBoxAsync(SelectedQueryAreaLayer, 4326);
 
                     // Get start and end dates
                     string startDate = QueryStartDate.ToString("yyyy'-'MM'-'dd");
                     string endDate = QueryEndDate.ToString("yyyy'-'MM'-'dd");
 
                     // Get selected collection (as raw collection name)
-                    List<string> collections = QueryCollections.Where(e => e.IsCollectionSelected).Select(e => e.RawName).ToList();
-                    if (collections.Count == 0)
+                    string[] collections = QueryCollections.Where(e => e.IsCollectionSelected).Select(e => e.RawName).ToArray();
+                    if (collections.Length == 0)
                     {
                         return;
                     }
@@ -587,16 +586,24 @@ namespace ArcDEA
                     // Get minimum valid percentage based on max invalid
                     float minValid = Convert.ToSingle(1.0 - (QueryCloudCover / 100));
 
+                    // Setup epsg value
+                    // TODO: add this to UI
+                    int epsg = 3577;
+
+                    // Setup resolution value
+                    // TODO: add this to UI
+                    double resolution = 30.0;
+
                     // Setup nodata value
                     // TODO: add this to UI
                     Int16 noDataValue = -999;
 
                     // Set user's output folder path
                     string outputFolder = OutputFolderPath;
-                    //if (outputFolder == null || !Directory.Exists(outputFolder))
-                    //{
-                        //return;
-                    //}
+                    if (outputFolder == null || !Directory.Exists(outputFolder))
+                    {
+                        return;
+                    }
 
                     // Set number of download retries
                     // TODO: implement this in UI
@@ -607,47 +614,41 @@ namespace ArcDEA
                     // Set progressor
                     RefreshProgressBar(1, 100, "Querying STAC endpoint...", true);
 
-                    // Construct STAC url, roots and flatten them into one
-                    Root root = await QueuedTask.Run(async () =>
-                    {
-                        List<Root> roots = new List<Root>();
-                        foreach (string collection in collections)
-                        {
-                            string url = Data.ConstructStacUrl(collection, startDate, endDate, bboxWgs84, 500);
-                            Root root = await Data.GetStacFromUrlAsync(url);
-                            roots.Add(root);
-                        }
-
-                        return Data.FlattenStacRoots(roots);
+                    // Initialise stac endpoint with relevant query details and populate via download
+                    Stac2 stac = new Stac2(collections, assets.ToArray(), startDate, endDate, inBoundingBox, epsg, resolution);
+                    await QueuedTask.Run(async () => {
+                        await stac.GetFeaturesAsync(client);
                     });
-                    if (root.Features.Count == 0)
+
+                    // Check we got something
+                    if (stac.Features.Count == 0)
                     {
                         return;
                     }
 
-                    // Convert STAC to download structure
-                    var items = Data.ConvertStacToDownloads(root, assets, bboxAlbers);
-
                     // Remove Landsat 7 data where SLC-off if requested
                     if (QueryIncludeSlcOff == false)
                     {
-                        items = Data.RemoveSlcOffData(items);
+                        stac.RemoveSlcOffFeatures();
                     }
 
-                    // Sort by datetime, group dates by solar day
-                    items = Data.SortByDateTime(items);
-                    items = Data.GroupBySolarDay(items);
+                    // Group by solar day (will sort), do another sort by date time (ascending) 
+                    stac.GroupBySolarDay();
+                    stac.SortFeaturesByDate();
+
+                    // Convert to list of download items (one per date)
+                    List<Download> downloads = stac.ConvertFeaturesToDownloads();
                     #endregion
 
                     #region Download and assess fmask data
                     // Set progressor
-                    RefreshProgressBar(1, items.Count, "Downloading and assessing fmask data...", false);
+                    RefreshProgressBar(1, downloads.Count, "Downloading and assessing fmask data...", false);
 
                     int i = 0;
-                    await QueuedTask.Run(() => Parallel.ForEachAsync(items, numCores, async (item, token) =>
+                    await QueuedTask.Run(() => Parallel.ForEachAsync(downloads, numCores, async (download, token) =>
                     {
                         // Download mask geotiff, get num valid pixels, flag item as valid (or not)
-                        await item.SetValidViaWcsMaskAsync(minValid, validPixels, client);
+                        download.CheckValidityViaMask(validPixels, minValid);
 
                         // Increment progress 
                         i = i + 1;
@@ -658,28 +659,32 @@ namespace ArcDEA
                         }
                     }));
 
-                    // Subset items to only those flagged as valid
-                    items = items.Where(e => e.Valid == true).ToList();
+                    // Subset downloads to only those flagged as valid
+                    downloads = downloads.Where(e => e.IsValid == true).ToList();
                     #endregion
 
                     #region Stream valid data, set invalid pixels to NoData, save to folder
                     // Set progressor
-                    RefreshProgressBar(1, items.Count, "Downloading and processing satellite data...", false);
+                    RefreshProgressBar(1, downloads.Count, "Downloading and processing satellite data...", false);
                     ProgressPercentage = "";
 
+                    System.Diagnostics.Stopwatch watch = new System.Diagnostics.Stopwatch();
+                    watch.Start();
+
                     i = 0;
-                    await QueuedTask.Run(() => Parallel.ForEachAsync(items, numCores, async (item, token) =>
+                    await QueuedTask.Run(() => Parallel.ForEachAsync(downloads, numCores, async (download, token) =>
                     {
                         if (SelectedAssetTabIndex == 0)
                         {
                             // Download raw raster bands requested by user
-                            await item.DownloadAndProcessViaFullAsync(outputFolder, validPixels, noDataValue, client);
+                            //await item.DownloadAndProcessViaFullAsync(outputFolder, validPixels, noDataValue, client);
+                            download.DownloadAndProcessFull();
                         }
                         else if (SelectedAssetTabIndex == 1)
                         {
                             // Download and process raster bands into index requested by user
-                            string index = QueryIndexAssets.Where(e => e.IsIndexAssetSelected).Select(e => e.ShortName).FirstOrDefault();
-                            await item.DownloadAndProcessViaIndexAsync(index, outputFolder, validPixels, noDataValue, client);
+                            //string index = QueryIndexAssets.Where(e => e.IsIndexAssetSelected).Select(e => e.ShortName).FirstOrDefault();
+                            //await item.DownloadAndProcessViaIndexAsync(index, outputFolder, validPixels, noDataValue, client);
                         }
                         else if (SelectedAssetTabIndex == 2)
                         {
@@ -691,6 +696,11 @@ namespace ArcDEA
                         progressValue.Report(i);
                         progressPercent.Report($"{Convert.ToInt32(i / MaxProgressValue * 100)}%");
                     }));
+
+                    watch.Stop();
+                    var dur = watch.Elapsed.ToString();
+                    System.Diagnostics.Debug.WriteLine($"Finished in: {dur}");
+
                     #endregion
 
                     // Final message

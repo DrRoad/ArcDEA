@@ -107,10 +107,26 @@ namespace ArcDEA.Classes
                     try
                     {
                         // Create full output path and filename
+                        string outTmp = Path.Combine(outputFolder, "tmp", "_", FinalFilename);
                         string outputFile = Path.Combine(outputFolder, FinalFilename);
 
                         // Download and read WCS full source raster (including mask band)
                         OSGeo.GDAL.Dataset sourceDS = OSGeo.GDAL.Gdal.Open(FullWcsUrl, OSGeo.GDAL.Access.GA_ReadOnly);
+
+                        // TESTING: we cna use vrts to do warps, projection, resize, posisbly nodata values, possibly calculations!
+                        // May want to save geotiff to temp folder, create vrt, warp, then save to final output folder to prevent x2 download
+                        OSGeo.GDAL.GDALWarpAppOptions options = new OSGeo.GDAL.GDALWarpAppOptions(new[] 
+                        { 
+                            "-t_srs", "EPSG:4326",
+                            //"-tr", "120", "120",
+                            //"-r", "near",
+                            //"-multi"
+                        });
+                        OSGeo.GDAL.Dataset outputDS = OSGeo.GDAL.Gdal.Warp("tmp.tif", new OSGeo.GDAL.Dataset[] { sourceDS }, options, null, null);
+
+
+                        //OSGeo.GDAL.Driver driverTmp = OSGeo.GDAL.Gdal.GetDriverByName("GTiff");
+                        //OSGeo.GDAL.Dataset sourceTmp = driverTmp.CreateCopy(outTmp, sourceDS, 0, null, null, null);
 
                         // Get source raster dimensions
                         int width = sourceDS.RasterXSize;

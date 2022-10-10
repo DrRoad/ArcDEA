@@ -10,9 +10,7 @@ The ArcDEA plugin enables you to:
 * Leverage the ArcGIS Pro image analysis capabilities to perform remote sensing analyses, compare imagery and other geospatial data, explore geo-statistical analysis and machine learning.
 
 ## Screenshot
-<p align="center">
-  <img src="ArcDEA/Documentation/Screenshots/arcdea_prototype_screenshot_v001.png" width="100%">
-</p>
+![Screenshot of ArcDEA prototype](ArcDEA/Documentation/Screenshots/arcdea_prototype_screenshot_v001.png?raw=true "Screenshot of ArcDEA prototype")
 
 ## Documentation
 Learn more about ArcDEA in its official documentation at (TODO).

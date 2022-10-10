@@ -1,4 +1,5 @@
 # ArcDEA: ArcGIS Pro Digital Earth Australia plugin
+[![Windows](https://svgshare.com/i/ZhY.svg)](https://svgshare.com/i/ZhY.svg)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 **AreaDEA** is an open source project that provides efficient access to the Digital Earth Australia (DEA) public data repository directly from ArcGIS Pro. 

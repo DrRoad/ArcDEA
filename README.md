@@ -8,7 +8,7 @@ The ArcDEA plugin enables you to:
 
 ## Screenshot
 <p align="center">
-  <img src="ArcDEA/Documentation/Screenshots/arcdea_prototype_screenshot_v001.png" width="80%">
+  <img src="ArcDEA/Documentation/Screenshots/arcdea_prototype_screenshot_v001.png" width="100%">
 </p>
 
 ## Documentation

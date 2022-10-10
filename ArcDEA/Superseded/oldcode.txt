@@ -470,3 +470,9 @@ public async Task Test(string index, string outputFolder, List<int> validPixels,
         Task.Delay(100);
     });
 }
+
+
+//OSGeo.GDAL.Gdal.SetConfigOption("AWS_NO_SIGN_REQUEST", "YES");
+//OSGeo.GDAL.Gdal.SetConfigOption("VSI_CACHE", "TRUE");
+//OSGeo.GDAL.Gdal.SetConfigOption("VSI_CACHE_SIZE ", Math.Pow(10, 9).ToString());
+//OSGeo.GDAL.Gdal.SetConfigOption("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR");

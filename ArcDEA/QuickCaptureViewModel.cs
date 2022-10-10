@@ -16,6 +16,8 @@ using ArcDEA.Classes;
 using System.Net.Http;
 using System.IO;
 using ArcGIS.Desktop.Framework.Controls;
+using System.Reflection;
+using System.Diagnostics;
 
 namespace ArcDEA
 {
@@ -475,11 +477,11 @@ namespace ArcDEA
         /// <summary>
         /// Sets whether the process is running or not.
         /// </summary>
-        private bool _isPocessing = false;
-        public bool IsProcessing
+        private bool _isNotPocessing = true;
+        public bool IsNotProcessing
         {
-            get { return _isPocessing; }
-            set { SetProperty(ref _isPocessing, value, () => IsProcessing); }
+            get { return _isNotPocessing; }
+            set { SetProperty(ref _isNotPocessing, value, () => IsNotProcessing); }
         }
         #endregion
 
@@ -493,9 +495,8 @@ namespace ArcDEA
                 return new RelayCommand(async () =>
                 {
                     #region General initialisation
-                    // Set that process is running
-                    // TODO: setup processing switch
-                    //IsProcessing = true;
+                    // Flag that process is now running
+                    IsNotProcessing = false;
 
                     // Set progressor
                     RefreshProgressBar(0, 100, "Initialising...", true);
@@ -503,27 +504,27 @@ namespace ArcDEA
                     IProgress<int> progressValue = new Progress<int>(e => ProgressValue = e);
                     IProgress<string> progressPercent = new Progress<string>(e => ProgressPercentage = e);
 
-                    // Register GDAL and set config options
-                    OSGeo.GDAL.Gdal.AllRegister();
+                    // Register GDAL and OGR via custom initialiser
+                    Helpers.CustomGdalConfigure();
+
+                    // Set optimal GDAL configurations
                     OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_UNSAFESSL", "YES");
-                    //OSGeo.GDAL.Gdal.SetConfigOption("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR");
                     OSGeo.GDAL.Gdal.SetConfigOption("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", "tif");
-                    //OSGeo.GDAL.Gdal.SetConfigOption("VSI_CACHE", "TRUE");
-                    //OSGeo.GDAL.Gdal.SetConfigOption("VSI_CACHE_SIZE ", Math.Pow(10, 9).ToString());
                     OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_MULTIRANGE", "YES");
                     OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_MERGE_CONSECUTIVE_RANGES", "YES");
-                    //OSGeo.GDAL.Gdal.SetConfigOption("AWS_NO_SIGN_REQUEST", "YES");
-
-                    // Register OSR and set config options
-                    OSGeo.OGR.Ogr.RegisterAll();
 
                     // Get the ArcGIS temporary folder path
                     string tmpFolder = Path.GetTempPath();
 
                     // Set download and processing num cores
                     int availableCores = Environment.ProcessorCount - 1;
+                    availableCores = availableCores * 2; // TODO: temp
+
                     var numCores = new ParallelOptions { MaxDegreeOfParallelism = availableCores };
                     System.Diagnostics.Debug.WriteLine($"Using {availableCores} cores.");
+
+                    // TESTING
+                    //numCores.MaxDegreeOfParallelism = 1;
 
                     // Open a HTTP client with 30 minute timeout
                     var client = new HttpClient();
@@ -576,8 +577,6 @@ namespace ArcDEA
 
                     // Setup valid classes and minimum valid pixels
                     List<int> validPixels = QueryMaskValues.Where(e => e.IsMaskValueSelected).Select(e => e.Value).ToList();
-
-                    // Ensure we have a at least one valid pixel value
                     if (validPixels.Count == 0)
                     {
                         return;
@@ -596,7 +595,10 @@ namespace ArcDEA
 
                     // Setup nodata value
                     // TODO: add this to UI
-                    Int16 noDataValue = -999;
+                    //Int16 noDataValue = -999;
+
+                    // TODO: set this on UI
+                    bool dropMaskBand = true;
 
                     // Set user's output folder path
                     string outputFolder = OutputFolderPath;
@@ -648,7 +650,7 @@ namespace ArcDEA
                     await QueuedTask.Run(() => Parallel.ForEachAsync(downloads, numCores, async (download, token) =>
                     {
                         // Download mask geotiff, get num valid pixels, flag item as valid (or not)
-                        download.CheckValidityViaMask(validPixels, minValid);
+                        await download.CheckValidityViaMaskAsync(validPixels, minValid);
 
                         // Increment progress 
                         i = i + 1;
@@ -663,28 +665,24 @@ namespace ArcDEA
                     downloads = downloads.Where(e => e.IsValid == true).ToList();
                     #endregion
 
-                    #region Stream valid data, set invalid pixels to NoData, save to folder
+                    #region Download valid data, set invalid pixels to NoData, save to folder
                     // Set progressor
                     RefreshProgressBar(1, downloads.Count, "Downloading and processing satellite data...", false);
                     ProgressPercentage = "";
-
-                    System.Diagnostics.Stopwatch watch = new System.Diagnostics.Stopwatch();
-                    watch.Start();
 
                     i = 0;
                     await QueuedTask.Run(() => Parallel.ForEachAsync(downloads, numCores, async (download, token) =>
                     {
                         if (SelectedAssetTabIndex == 0)
                         {
-                            // Download raw raster bands requested by user
-                            //await item.DownloadAndProcessViaFullAsync(outputFolder, validPixels, noDataValue, client);
-                            download.DownloadAndProcessFull();
+                            // Download full set of raster bands requested by user
+                            await download.DownloadAndProcessFullAsync(outputFolder, validPixels, dropMaskBand);
                         }
                         else if (SelectedAssetTabIndex == 1)
                         {
                             // Download and process raster bands into index requested by user
-                            //string index = QueryIndexAssets.Where(e => e.IsIndexAssetSelected).Select(e => e.ShortName).FirstOrDefault();
-                            //await item.DownloadAndProcessViaIndexAsync(index, outputFolder, validPixels, noDataValue, client);
+                            string index = QueryIndexAssets.Where(e => e.IsIndexAssetSelected).Select(e => e.ShortName).FirstOrDefault();
+                            await download.DownloadAndProcessIndexAsync(outputFolder, index, validPixels, dropMaskBand);
                         }
                         else if (SelectedAssetTabIndex == 2)
                         {
@@ -696,16 +694,14 @@ namespace ArcDEA
                         progressValue.Report(i);
                         progressPercent.Report($"{Convert.ToInt32(i / MaxProgressValue * 100)}%");
                     }));
-
-                    watch.Stop();
-                    var dur = watch.Elapsed.ToString();
-                    System.Diagnostics.Debug.WriteLine($"Finished in: {dur}");
-
                     #endregion
 
                     // Final message
                     RefreshProgressBar(1, 1, "Finished.", false);
                     ProgressPercentage = "";
+
+                    // Turn processing flag off
+                    IsNotProcessing = true;
                 });
             }
         }

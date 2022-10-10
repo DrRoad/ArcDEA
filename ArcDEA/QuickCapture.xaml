@@ -70,7 +70,8 @@
                           Grid.Column="0" 
                           Margin="0,0,5,0" 
                           ItemsSource="{Binding QueryAreaLayers}" 
-                          SelectedItem="{Binding SelectedQueryAreaLayer, Mode=TwoWay}">
+                          SelectedItem="{Binding SelectedQueryAreaLayer, Mode=TwoWay}"
+                          IsEnabled="{Binding IsNotProcessing}">
                 </ComboBox>
 
                 <!-- Query area new button-->
@@ -80,6 +81,7 @@
                         Height="20"
                         BorderBrush="Transparent"
                         Command="{Binding CmdDrawQueryArea}"
+                        IsEnabled="{Binding IsNotProcessing}"
                         ToolTip="Draw new query area">
                     <Image Source="pack://application:,,,/ArcDEA;component/Images/DrawNewQueryArea16.png" 
                            Width="16" 
@@ -114,7 +116,8 @@
                 <!-- Start date combobox-->
                 <DatePicker Name="DateSetStartDate" 
                             Grid.Column="0"  
-                            SelectedDate="{Binding QueryStartDate}">
+                            SelectedDate="{Binding QueryStartDate}"
+                            IsEnabled="{Binding IsNotProcessing}">
                     <DatePicker.Resources>
                         <Style TargetType="DatePickerTextBox">
                             <Setter Property="VerticalAlignment" Value="Center" />
@@ -134,7 +137,8 @@
                 <!-- End date combobox-->
                 <DatePicker Name="DateSetEndDate" 
                             Grid.Column="2"  
-                            SelectedDate="{Binding QueryEndDate}">
+                            SelectedDate="{Binding QueryEndDate}"
+                            IsEnabled="{Binding IsNotProcessing}">
                     <DatePicker.Resources>
                         <Style TargetType="DatePickerTextBox">
                             <Setter Property="VerticalAlignment" Value="Center" />
@@ -160,7 +164,8 @@
                      MinHeight="60"
                      MaxHeight="140"
                      SelectionMode="Multiple" 
-                     ItemsSource="{Binding QueryCollections}">
+                     ItemsSource="{Binding QueryCollections}"
+                     IsEnabled="{Binding IsNotProcessing}">
 
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="ListBoxItem">
@@ -182,7 +187,8 @@
                                           Content="{Binding CleanName}" 
                                           IsChecked="{Binding IsSelected, Mode=OneWay, RelativeSource={RelativeSource AncestorType=ListBoxItem, Mode=FindAncestor}}"
                                           Focusable="False"
-                                          IsHitTestVisible="False"/>
+                                          IsHitTestVisible="False"
+                                          IsEnabled="{Binding IsNotProcessing}"/>
 
                                 <!-- Collection item checkbox -->
                                 <TextBlock Grid.Column="1" 
@@ -199,7 +205,8 @@
                       Content="Include SLC-off data"
                       Focusable="False"
                       IsHitTestVisible="True"
-                      IsChecked="{Binding QueryIncludeSlcOff}">
+                      IsChecked="{Binding QueryIncludeSlcOff}"
+                      IsEnabled="{Binding IsNotProcessing}">
             </CheckBox>
             
             <!-- Provisional -->
@@ -222,7 +229,8 @@
             <TabControl Grid.Row="4"
                         MinHeight="100"
                         MaxHeight="300"
-                        SelectedIndex="{Binding SelectedAssetTabIndex}">
+                        SelectedIndex="{Binding SelectedAssetTabIndex}"
+                        IsEnabled="{Binding IsNotProcessing}">
 
                 <!-- Raw Assets Tab and Listbox -->
                 <TabItem Header="Raw">
@@ -414,7 +422,8 @@
         <!-- Output folder controls -->
         <StackPanel Grid.Row="6" 
                     Margin="10" 
-                    Background="Transparent">
+                    Background="Transparent"
+                    IsEnabled="{Binding IsNotProcessing}">
 
             <!-- Output folder heading-->
             <TextBlock Name="TxbOutputFolderHeading" 

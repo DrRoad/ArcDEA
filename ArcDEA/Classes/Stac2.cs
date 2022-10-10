@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
@@ -234,6 +235,7 @@ namespace ArcDEA.Classes
     public class Download
     {
         public string Id { get; set; }
+        public DateTime Date { get; set; }
         public Dictionary<string, string> Urls { get; set; }
         public bool IsValid { get; set; } = false;
 
@@ -242,18 +244,19 @@ namespace ArcDEA.Classes
         /// </summary>
         /// <param name="id"></param>
         /// <param name="urls"></param>
-        public Download(string id, Dictionary<string, string> urls)
+        public Download(string id, DateTime date, Dictionary<string, string> urls)
         {
             Id = id;
+            Date = date;
             Urls = urls;
         }
-    
+
         /// <summary>
         /// 
         /// </summary>
         /// <param name="validPixels"></param>
         /// <param name="minValid"></param>
-        public void CheckValidityViaMask(List<int> validPixels, double minValid)
+        public async Task CheckValidityViaMaskAsync(List<int> validPixels, double minValid)
         {
             // Fmask classes:
             //Unclassified -> 0.
@@ -273,46 +276,54 @@ namespace ArcDEA.Classes
                 return;
             }
 
-            try
+            await Task.Run(() =>
             {
-                // Open (download) mask WCS url
-                using (OSGeo.GDAL.Dataset ds = OSGeo.GDAL.Gdal.Open(url, OSGeo.GDAL.Access.GA_ReadOnly))
+                try
                 {
-                    // Isolate raster fmask band
-                    OSGeo.GDAL.Band band = ds.GetRasterBand(1);
-
-                    // Get required raster band dimensions
-                    int width = band.XSize;
-                    int height = band.YSize;
-                    int size = width * height;
-
-                    // Read byte values into block array
-                    Byte[] block = new Byte[size];
-                    band.ReadRaster(0, 0, width, height, block, width, height, 0, 0);
-
-                    // Get distinct pixel values and counts, non-zero (overlap) pixel total and number valid
-                    var counts = block.GroupBy(e => e).Select(x => new { key = x.Key, val = x.Count() }).ToList();
-                    long valid = block.Where(e => validPixels.Contains(e)).ToArray().Length;
-                    long total = counts.Where(e => e.key != 0).Sum(e => e.val);
-
-                    // Calculate percentage of valid pixels,  keep if >= minimum allowed
-                    if (((double)valid / (double)total) >= minValid)
+                    // Open (download) mask WCS url
+                    using (OSGeo.GDAL.Dataset ds = OSGeo.GDAL.Gdal.Open(url, OSGeo.GDAL.Access.GA_ReadOnly))
                     {
-                        IsValid = true;
-                    }
+                        // Isolate raster fmask band
+                        OSGeo.GDAL.Band band = ds.GetRasterBand(1);
 
-                    // Notify
-                    Debug.WriteLine($"Ended validity check: {Id}");
+                        // Get required raster band dimensions
+                        int width = band.XSize;
+                        int height = band.YSize;
+                        int size = width * height;
+
+                        // Read byte values into block array
+                        Byte[] block = new Byte[size];
+                        band.ReadRaster(0, 0, width, height, block, width, height, 0, 0);
+
+                        // Get distinct pixel values and counts, non-zero (overlap) pixel total and number valid
+                        var counts = block.GroupBy(e => e).Select(x => new { key = x.Key, val = x.Count() }).ToList();
+                        long valid = block.Where(e => validPixels.Contains(e)).ToArray().Length;
+                        long total = counts.Where(e => e.key != 0).Sum(e => e.val);
+
+                        // Calculate percentage of valid pixels,  keep if >= minimum allowed
+                        if (((double)valid / (double)total) >= minValid)
+                        {
+                            IsValid = true;
+                        }
+                    }
                 }
-            }
-            catch (Exception e)
-            {
-                Debug.WriteLine("Error during mask download!");
-            }
+                catch (Exception e)
+                {
+                    Debug.WriteLine("Error during mask download!");
+                }
+            });
         }
-    
-        public void DownloadAndProcessFull()
+
+        public async Task DownloadAndProcessFullAsync(string outputFolder, List<int> validPixels, bool dropMaskBand)
         {
+            // TODO: some pixel values come back as -999, is -999 no data or 0 for dea landsat/sentinel?
+            // on closer look, these -999 pixels are occurring under fmask class 5 (water)
+            // do we want to set any value < 0 to 0?
+
+            // Create full output filename and combine with output folder
+            string outputFilename = $"{Date.Year}-{Date.Month}-{Date.Day}.tif";
+            string outputFile = Path.Combine(outputFolder, outputFilename);
+
             // Extract and check fmask WCS url
             string url = Urls.GetValueOrDefault("Full");
             if (url == null)
@@ -320,45 +331,210 @@ namespace ArcDEA.Classes
                 return;
             }
 
-            try
+            await Task.Run(() =>
             {
-                // Open (download) mask WCS url
-                using (OSGeo.GDAL.Dataset ds = OSGeo.GDAL.Gdal.Open(url, OSGeo.GDAL.Access.GA_ReadOnly))
+                try
                 {
-                    // Isolate raster fmask band
-                    //OSGeo.GDAL.Band band = ds.GetRasterBand(1);
+                    // Open (download) full WCS url
+                    using (OSGeo.GDAL.Dataset inDS = OSGeo.GDAL.Gdal.Open(url, OSGeo.GDAL.Access.GA_Update))
+                    {
+                        // Get required dataset dimensions (all bands will be uniform)
+                        int width = inDS.RasterXSize;
+                        int height = inDS.RasterYSize;
+                        int size = width * height;
 
-                    // Get required raster band dimensions
-                    //int width = band.XSize;
-                    //int height = band.YSize;
-                    //int size = width * height;
+                        // Create a dict of band names and a "value tuple" of index, band, block data
+                        var bands = new Dictionary<string, (int Index, OSGeo.GDAL.Band Band, short[] Block)>();
+                        for (int i = 1; i <= inDS.RasterCount; i++)
+                        {
+                            OSGeo.GDAL.Band band = inDS.GetRasterBand(i);
+                            string bandName = band.GetDescription();
 
-                    // Read byte values into block array
-                    //Byte[] block = new Byte[size];
-                    //band.ReadRaster(0, 0, width, height, block, width, height, 0, 0);
+                            short[] block = new short[size];
+                            band.ReadRaster(0, 0, width, height, block, width, height, 0, 0);
 
-                    // Get distinct pixel values and counts, non-zero (overlap) pixel total and number valid
-                    //var counts = block.GroupBy(e => e).Select(x => new { key = x.Key, val = x.Count() }).ToList();
-                    //long valid = block.Where(e => validPixels.Contains(e)).ToArray().Length;
-                    //long total = counts.Where(e => e.key != 0).Sum(e => e.val);
+                            bands.Add(bandName, (i, band, block));
+                        }
 
-                    // Calculate percentage of valid pixels,  keep if >= minimum allowed
-                    //if (((double)valid / (double)total) >= minValid)
-                    //{
-                        //IsValid = true;
-                    //}
+                        // Iterate each band block and set pixels to 0 where mask value invalid
+                        for (int i = 0; i < bands["oa_fmask"].Block.Length; i++)
+                        {
+                            if (!validPixels.Contains(bands["oa_fmask"].Block[i]))
+                            {
+                                foreach (var band in bands)
+                                {
+                                    if (band.Key != "oa_fmask")
+                                    {
+                                        band.Value.Block[i] = (short)0;
+                                    }
+                                }
+                            }
+                        }
 
-                    // Notify
-                    Debug.WriteLine($"Ended download: {Id}");
+                        // TODO: remove anything < 0
+
+                        // Iterate each band and block and write changes
+                        foreach (var band in bands)
+                        {
+                            if (band.Key != "oa_fmask")
+                            {
+                                band.Value.Band.WriteRaster(0, 0, width, height, band.Value.Block, width, height, 0, 0);
+                            }
+                        }
+
+                        // Save changed to dataset
+                        inDS.FlushCache();
+
+                        // Drop mask band, if requested...
+                        if (dropMaskBand == true)
+                        {
+                            // Get non-mask band indexes for translate options
+                            List<string> keepBands = new List<string>();
+                            foreach(var band in bands)
+                            {
+                                if (band.Key != "oa_fmask")
+                                {
+                                    keepBands.Add("-b");
+                                    keepBands.Add(band.Value.Index.ToString());
+                                }
+                            }
+
+                            // Setup translate options, perform translate to subset bands, export as GeoTiff
+                            OSGeo.GDAL.GDALTranslateOptions options = new OSGeo.GDAL.GDALTranslateOptions(keepBands.ToArray());
+                            OSGeo.GDAL.Gdal.wrapper_GDALTranslate(outputFile, inDS, options, null, null);
+                        }
+                        else
+                        {
+                            // Export as GeoTiff if no modifications needed
+                            OSGeo.GDAL.Driver driver = OSGeo.GDAL.Gdal.GetDriverByName("GTiff");
+                            OSGeo.GDAL.Dataset outDS = driver.CreateCopy(outputFile, inDS, 0, null, null, null);
+                        }
+
+                        // Notify
+                        Debug.WriteLine($"Ended download: {Id}");
+                    }
                 }
-            }
-            catch (Exception e)
-            {
-                Debug.WriteLine("Error during full download!");
-            }
+                catch (Exception e)
+                {
+                    Debug.WriteLine("Error during full download!");
+                }
+            });
         }
-    
-    
+
+        public async Task DownloadAndProcessIndexAsync(string outputFolder, string index, List<int> validPixels, bool dropMaskBand)
+        {
+            // TODO: take user nodatavalue
+            float noDataValue = -999;
+
+            // Create full output filename and combine with output folder
+            string outputFilename = $"{Date.Year}-{Date.Month}-{Date.Day}.tif";
+            string outputFile = Path.Combine(outputFolder, outputFilename);
+
+            // Extract and check fmask WCS url
+            string url = Urls.GetValueOrDefault("Full");
+            if (url == null)
+            {
+                return;
+            }
+
+            await Task.Run(() =>
+            {
+                try
+                {
+                    // Open (download) full WCS url
+                    using (OSGeo.GDAL.Dataset inDS = OSGeo.GDAL.Gdal.Open(url, OSGeo.GDAL.Access.GA_Update))
+                    {
+                        // Get required dataset dimensions (all bands will be uniform)
+                        int width = inDS.RasterXSize;
+                        int height = inDS.RasterYSize;
+                        int size = width * height;
+
+                        // Create a dict of band names and a "value tuple" of index, band, block data
+                        var bands = new Dictionary<string, (int Index, OSGeo.GDAL.Band Band, short[] Block)>();
+                        for (int i = 1; i <= inDS.RasterCount; i++)
+                        {
+                            OSGeo.GDAL.Band band = inDS.GetRasterBand(i);
+                            string bandName = band.GetDescription();
+
+                            short[] block = new short[size];
+                            band.ReadRaster(0, 0, width, height, block, width, height, 0, 0);
+
+                            bands.Add(bandName, (i, band, block));
+                        }
+
+                        // TODO: use using
+
+                        // Copy dataset to new in-memory dataset so we can add index band
+                        OSGeo.GDAL.Driver memDriver = OSGeo.GDAL.Gdal.GetDriverByName("MEM");
+                        OSGeo.GDAL.Dataset tmpDS = memDriver.CreateCopy("", inDS, 0, null, null, null);
+
+                        // Add new empty index band to dataset
+                        tmpDS.AddBand(OSGeo.GDAL.DataType.GDT_Float32, null);
+
+                        // Get the new band for index values (will be last index)
+                        OSGeo.GDAL.Band indexBand = tmpDS.GetRasterBand(tmpDS.RasterCount);
+                        indexBand.SetDescription(index.ToLower());
+
+                        // Read index values into index block (there will be none)
+                        float[] indexBlock = new float[size];
+                        indexBand.ReadRaster(0, 0, width, height, indexBlock, width, height, 0, 0);
+
+                        // Process block depending on user selection
+                        // https://github.com/GeoscienceAustralia/dea-notebooks/blob/develop/Tools/dea_tools/bandindices.py
+                        if (index == "EVI")
+                        {
+                            indexBlock = Helpers.EVI(indexBlock, bands["nbart_blue"].Block, bands["nbart_red"].Block, bands["nbart_nir"].Block, bands["oa_fmask"].Block, validPixels, noDataValue);
+                        }
+                        else if (index == "LAI")
+                        {
+                            indexBlock = Helpers.LAI(indexBlock, bands["nbart_blue"].Block, bands["nbart_red"].Block, bands["nbart_nir"].Block, bands["oa_fmask"].Block, validPixels, noDataValue);
+                        }
+                        else if (index == "MSAVI")
+                        {
+                            indexBlock = Helpers.MSAVI(indexBlock, bands["nbart_red"].Block, bands["nbart_nir"].Block, bands["oa_fmask"].Block, validPixels, noDataValue);
+                        }
+                        else if (index == "NDVI")
+                        {
+                            indexBlock = Helpers.NDVI(indexBlock, bands["nbart_red"].Block, bands["nbart_nir"].Block, bands["oa_fmask"].Block, validPixels, noDataValue);
+                        }
+                        else if (index == "kNDVI")
+                        {
+                            indexBlock = Helpers.kNDVI(indexBlock, bands["nbart_red"].Block, bands["nbart_nir"].Block, bands["oa_fmask"].Block, validPixels, noDataValue);
+                        }
+
+                        // Write changes to index band
+                        indexBand.WriteRaster(0, 0, width, height, indexBlock, width, height, 0, 0);
+
+                        // Set nodata
+                        indexBand.SetNoDataValue(float.Epsilon);
+
+                        // Save changed to temporary dataset
+                        tmpDS.FlushCache();
+
+                        // Prepare output band parameters for translate, add mask to end if requested
+                        List<string> keepBands = new List<string>() { "-b", tmpDS.RasterCount.ToString()};
+                        if (dropMaskBand == false)
+                        {
+                            int maskBandIndex = Helpers.GetMaskBandIndex(tmpDS);
+                            keepBands.Add("-b");
+                            keepBands.Add(maskBandIndex.ToString());
+                        }
+
+                        // Setup translate options, perform translate to subset bands, export as GeoTiff
+                        OSGeo.GDAL.GDALTranslateOptions options = new OSGeo.GDAL.GDALTranslateOptions(keepBands.ToArray());
+                        OSGeo.GDAL.Gdal.wrapper_GDALTranslate(outputFile, tmpDS, options, null, null);
+
+                        // Notify
+                        Debug.WriteLine($"Ended download: {Id}");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine("Error during full download!");
+                }
+            });
+        }
+
     }
     #endregion
 
@@ -517,7 +693,7 @@ namespace ArcDEA.Classes
                 // Project input bbox to output bbox coordinates and set as string
                 double[] outBoundingBox = Helpers.ReprojectBoundingBox(BoundingBox, 4326, Epsg);
                 string bbox = string.Join(",", outBoundingBox);
-                
+
                 // Convert epsg and resolution to strings
                 string epsg = $"EPSG:{Epsg}";
                 string resolution = Resolution.ToString();
@@ -550,9 +726,9 @@ namespace ArcDEA.Classes
                     };
 
                     // Create new download item and add to downloads
-                    Download download = new Download(feature.Id, urls);
+                    Download download = new Download(feature.Id, feature.Properties.DateTime, urls);
                     downloads.Add(download);
-               }
+                }
             }
 
             return downloads;

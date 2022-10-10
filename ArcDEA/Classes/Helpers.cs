@@ -3,7 +3,9 @@ using ArcGIS.Desktop.Framework.Threading.Tasks;
 using ArcGIS.Desktop.Mapping;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -125,8 +127,12 @@ namespace ArcDEA.Classes
         {
             List<AssetIndexItem> items = new List<AssetIndexItem>()
             {
+                { new AssetIndexItem("EVI", "Enhanced Vegetation Index", new List<string> { "nbart_blue", "nbart_red", "nbart_nir" }, false) },
+                { new AssetIndexItem("LAI", "Leaf Area Index", new List<string> { "nbart_blue", "nbart_red", "nbart_nir" }, false) },
+                { new AssetIndexItem("MSAVI", "Modified Soil Adjusted Vegetation Index", new List<string> { "nbart_red", "nbart_nir" }, false) },
                 { new AssetIndexItem("NDVI", "Normalised Difference Vegetation Index", new List<string> { "nbart_red", "nbart_nir" }, false) },
-                { new AssetIndexItem("SLAVI", "Specific Leaf Area Vegetation Index", new List<string> { "nbart_red", "nbart_nir", "nbart_swir_2" }, false) }
+                { new AssetIndexItem("kNDVI", "Non-linear Normalised Difference Vegation Index", new List<string> { "nbart_red", "nbart_nir" }, false) }
+                //{ new AssetIndexItem("SLAVI", "Specific Leaf Area Vegetation Index", new List<string> { "nbart_red", "nbart_nir", "nbart_swir_2" }, false) }
             };
 
             return items;
@@ -153,6 +159,33 @@ namespace ArcDEA.Classes
         }
         #endregion
 
+        /// <summary>
+        /// NuGet GDAL + ESRI ArcGIS Pro has some issues initialising GDAL.
+        /// Namely, not all required DLLs are copied to assembly cache on run.
+        /// To get around this, a gdal folder exists in project with latest dlls,
+        /// (excluding four key dlls from nuget) which is copied to assembley cache.
+        /// These dlls need to be in assembley root, so a move is done to take them
+        /// out of that folder into root. GDAL and OGR are then registered.
+        /// </summary>
+        public static void CustomGdalConfigure()
+        {
+            // Get current folder of assembly cache
+            string assemblyFolder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            // Construct expected gdal folder that is copied on run
+            string gdalFolder = Path.Join(assemblyFolder, "gdal");
+
+            // Move all files within gdal folder to root of assembly cache
+            foreach (var file in Directory.GetFiles(gdalFolder))
+            {
+                File.Move(file, Path.Combine(assemblyFolder, Path.GetFileName(file)));
+            }
+
+            // Register Gdal and Ogr now that DLLs are in assembly cache
+            OSGeo.GDAL.Gdal.AllRegister();
+            OSGeo.OGR.Ogr.RegisterAll();
+        }
+        
         /// <summary>
         /// Extract bounding box from a graphics layer and project to EPSG code.
         /// </summary>
@@ -186,7 +219,13 @@ namespace ArcDEA.Classes
             return bbox;
         }
     
-        //
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="inBoundingBox"></param>
+        /// <param name="inEpsg"></param>
+        /// <param name="outEpsg"></param>
+        /// <returns></returns>
         public static double[] ReprojectBoundingBox(double[] inBoundingBox, int inEpsg, int outEpsg)
         {
             // Check bounding box
@@ -222,6 +261,222 @@ namespace ArcDEA.Classes
             transformer.TransformBounds(outBoundingBox, minX, minY, maxX, maxY, 0);
 
             return outBoundingBox;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="ds"></param>
+        /// <returns></returns>
+        public static int GetMaskBandIndex(OSGeo.GDAL.Dataset ds)
+        {
+            int maskbandIndex = -1; // TODO: this isnt optimal
+            for (int b = 1; b <= ds.RasterCount; b++)
+            {
+                string bandName = ds.GetRasterBand(b).GetDescription();
+                if (bandName == "oa_fmask")
+                {
+                    maskbandIndex = b;
+                }
+            }
+            
+            return maskbandIndex;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="ds"></param>
+        /// <returns></returns>
+        public static Dictionary<string, int> GetBandIndexMap(OSGeo.GDAL.Dataset ds)
+        {
+            if (ds.RasterCount == 0)
+            {
+                return null;
+            }
+
+            Dictionary<string, int> bandIndexMap = new Dictionary<string, int>();
+            for (int b = 1; b <= ds.RasterCount; b++)
+            {
+                string bandName = ds.GetRasterBand(b).GetDescription();
+                if (bandName == null)
+                {
+                    bandName = $"unknown_{b}";
+                }
+
+                bandIndexMap.Add(bandName, b);
+            }
+
+            return bandIndexMap;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="indexBlock"></param>
+        /// <param name="blueBlock"></param>
+        /// <param name="redBlock"></param>
+        /// <param name="nirBlock"></param>
+        /// <param name="maskBlock"></param>
+        /// <param name="validPixels"></param>
+        /// <param name="noDataValue"></param>
+        /// <returns></returns>
+        public static float[] EVI(float[] indexBlock, short[] blueBlock, short[] redBlock, short[] nirBlock, short[] maskBlock, List<int> validPixels, float noDataValue)
+        {
+            for (int i = 0; i < maskBlock.Length; i++)
+            {
+                if (!validPixels.Contains(maskBlock[i]))
+                {
+                    indexBlock[i] = float.Epsilon; // TODO take user value
+                }
+                else if (blueBlock[i] < 0F || redBlock[i] < 0F || nirBlock[i] < 0F)
+                {
+                    indexBlock[i] = float.Epsilon;
+                }
+                else
+                {
+                    float blue = (float)blueBlock[i];
+                    float red = (float)redBlock[i];
+                    float nir = (float)nirBlock[i];
+                    indexBlock[i] = (2.5F * (nir - red)) / (nir + 6F * red - 7.5F * blue + 1F);
+                }
+            }
+
+            return indexBlock;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="indexBlock"></param>
+        /// <param name="blueBlock"></param>
+        /// <param name="redBlock"></param>
+        /// <param name="nirBlock"></param>
+        /// <param name="maskBlock"></param>
+        /// <param name="validPixels"></param>
+        /// <param name="noDataValue"></param>
+        /// <returns></returns>
+        public static float[] LAI(float[] indexBlock, short[] blueBlock, short[] redBlock, short[] nirBlock, short[] maskBlock, List<int> validPixels, float noDataValue)
+        {
+            for (int i = 0; i < maskBlock.Length; i++)
+            {
+                if (!validPixels.Contains(maskBlock[i]))
+                {
+                    indexBlock[i] = float.Epsilon; // TODO take user value
+                }
+                else if (blueBlock[i] < 0F || redBlock[i] < 0F || nirBlock[i] < 0F)
+                {
+                    indexBlock[i] = float.Epsilon;
+                }
+                else
+                {
+                    float blue = (float)blueBlock[i];
+                    float red = (float)redBlock[i];
+                    float nir = (float)nirBlock[i];
+                    indexBlock[i] = 3.618F * ((2.5F * (nir - red)) / (nir + 6F * red - 7.5F * blue + 1F)) - 0.118F;
+                }
+            }
+
+            return indexBlock;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="indexBlock"></param>
+        /// <param name="redBlock"></param>
+        /// <param name="nirBlock"></param>
+        /// <param name="maskBlock"></param>
+        /// <param name="validPixels"></param>
+        /// <param name="noDataValue"></param>
+        /// <returns></returns>
+        public static float[] MSAVI(float[] indexBlock, short[] redBlock, short[] nirBlock, short[] maskBlock, List<int> validPixels, float noDataValue)
+        {
+            for (int i = 0; i < maskBlock.Length; i++)
+            {
+                if (!validPixels.Contains(maskBlock[i]))
+                {
+                    indexBlock[i] = float.Epsilon; // TODO take user value
+                }
+                else if (redBlock[i] < 0F || nirBlock[i] < 0F)
+                {
+                    indexBlock[i] = float.Epsilon;
+                }
+                else
+                {
+                    float red = (float)redBlock[i];
+                    float nir = (float)nirBlock[i];
+                    indexBlock[i] =  (2F * nir + 1F - (float)Math.Pow(((float)Math.Pow(2F * nir + 1F, 2) - 8F * (nir - red)), 0.5F)) / 2F;
+                }
+            }
+
+            return indexBlock;
+        }
+
+        /// <summary>
+        /// Calculate NDVI index provided a red and nir array obtained from a ratser band.
+        /// </summary>
+        /// <param name="indexBlock"></param>
+        /// <param name="redBlock"></param>
+        /// <param name="nirBlock"></param>
+        /// <param name="maskBlock"></param>
+        /// <param name="validPixels"></param>
+        /// <param name="noDataValue"></param>
+        /// <returns></returns>
+        public static float[] NDVI(float[] indexBlock, short[] redBlock, short[] nirBlock, short[] maskBlock, List<int> validPixels, float noDataValue)
+        {
+            for (int i = 0; i < maskBlock.Length; i++)
+            {
+                if (!validPixels.Contains(maskBlock[i]))
+                {
+                    indexBlock[i] = float.Epsilon; // TODO take user value
+                }
+                else if (redBlock[i] < 0F || nirBlock[i] < 0F)
+                {
+                    indexBlock[i] = float.Epsilon;
+                }
+                else
+                {
+                    float red = (float)redBlock[i];
+                    float nir = (float)nirBlock[i];
+                    indexBlock[i] = (nir - red) / (nir + red);
+                }
+            }
+
+            return indexBlock;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="indexBlock"></param>
+        /// <param name="redBlock"></param>
+        /// <param name="nirBlock"></param>
+        /// <param name="maskBlock"></param>
+        /// <param name="validPixels"></param>
+        /// <param name="noDataValue"></param>
+        /// <returns></returns>
+        public static float[] kNDVI(float[] indexBlock, short[] redBlock, short[] nirBlock, short[] maskBlock, List<int> validPixels, float noDataValue)
+        {
+            for (int i = 0; i < maskBlock.Length; i++)
+            {
+                if (!validPixels.Contains(maskBlock[i]))
+                {
+                    indexBlock[i] = float.Epsilon; // TODO take user value
+                }
+                else if (redBlock[i] < 0F || nirBlock[i] < 0F)
+                {
+                    indexBlock[i] = float.Epsilon;
+                }
+                else
+                {
+                    float red = (float)redBlock[i];
+                    float nir = (float)nirBlock[i];                   
+                    indexBlock[i] = (float)Math.Tanh((float)Math.Pow((nir - red) / (nir + red), 2F));
+                }
+            }
+
+            return indexBlock;
         }
     }
 }

@@ -1,5 +1,5 @@
 # ArcDEA: ArcGIS Pro Digital Earth Australia plugin
-**AreaDEA** is an open source project that provides efficient access to the Digital Earth Australia (DEA) public data repository directly within ArcGIS Pro. This project is not affiliated with Digital Earth Australia.
+**AreaDEA** is an open source project that provides efficient access to the Digital Earth Australia (DEA) public data repository directly from ArcGIS Pro. 
 
 The ArcDEA plugin enables you to:
 * Unlock the ability to interactively browse and download numerous high quality satellite [products](https://www.dea.ga.gov.au/products) offered by Digital Earth Australia directly within ArcGIS Pro.
@@ -30,3 +30,5 @@ List licenses of GDAL, OGR, etc. (TODO, see xarray github).
 ArcDEA uses GDAL Xarray bundles portions of pandas, NumPy and Seaborn, all of which are available under a "3-clause BSD" license:
 
 ArcDEA uses icons from... (TODO)
+
+This project is not affiliated with Digital Earth Australia.

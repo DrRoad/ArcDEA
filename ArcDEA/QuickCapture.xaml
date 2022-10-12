@@ -36,12 +36,12 @@
                    KeyboardNavigation.TabNavigation="Local" >
             
             <!--new-->
-            <ListBox x:Name="primaryNavigator" 
+            <!--<ListBox x:Name="primaryNavigator" 
                      VerticalAlignment="Top"
                      Style="{DynamicResource Esri_ListBoxPanelIndicator}"
                      ItemsSource="{Binding PrimaryMenuList}" 
                      SelectedIndex="{Binding SelectedPanelHeaderIndex, Mode=TwoWay}"
-                     IsSynchronizedWithCurrentItem="True"/>
+                     IsSynchronizedWithCurrentItem="True"/>-->
         </DockPanel>
 
         <!-- Query area controls -->
@@ -91,8 +91,77 @@
             </Grid>
         </StackPanel>
 
-        <!-- Dates controls -->
+        <!-- Dataset controls -->
         <StackPanel Grid.Row="2" 
+                    Margin="5">
+
+            <!-- Dataset heading-->
+            <TextBlock Name="TxbQueryDataset" 
+                       Margin="0,0,0,2" 
+                       Style="{DynamicResource Esri_TextBlockH3}"
+                       Text="Dataset">
+            </TextBlock>
+
+            <!--  combobox-->
+            <!--ItemsSource="{Binding QueryDataset}" -->
+            <!--Height="21.96"-->
+            <ComboBox Name="CbxDataset" 
+                      Grid.Column="0" 
+                      Text="Landsat"
+                      ItemsSource="{Binding QueryDatasets}" 
+                      SelectedItem="{Binding SelectedQueryDataset, Mode=TwoWay}"  
+                      IsEnabled="{Binding IsNotProcessing}">
+
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel x:Name="DatasetStackOutter"
+                                    Margin="5" 
+                                    Orientation="Horizontal">
+                            <Image x:Name="DatasetIcon" Height="32" Source="{Binding IconPath}"></Image>
+                            <StackPanel x:Name="DatasetStackInner"
+                                        Margin="10,0,0,0">
+                                <TextBlock x:Name="DatasetName"
+                                           Text="{Binding Name}"
+                                           VerticalAlignment="Center"
+                                           Style="{DynamicResource Esri_TextBlockH4}"/>
+                                <TextBlock x:Name="DatasetDescription"
+                                           Text="{Binding Description}" 
+                                           VerticalAlignment="Center"
+                                           Style="{DynamicResource Esri_TextBlockH6}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <DataTemplate.Triggers>
+
+                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType={x:Type ComboBoxItem}}}" Value="{x:Null}">
+                                <Setter TargetName="DatasetIcon" Property="Visibility" Value="Collapsed"/>
+                                <Setter TargetName="DatasetDescription" Property="Visibility" Value="Collapsed"/>
+                                <Setter TargetName="DatasetStackOutter" Property="Margin" Value="0"/>
+                                <Setter TargetName="DatasetStackInner" Property="Margin" Value="0,0,0,0"/>
+                                <Setter TargetName="DatasetName" Property="Style" Value="{DynamicResource Esri_TextBlockH5}"/>
+                            </DataTrigger>
+
+
+                            <!-- This trigger fires for the selected item in the drop-down list -->
+                            <!--<DataTrigger Binding="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=ComboBoxItem}, Path=IsSelected}" Value="True">
+                                <Setter TargetName="DatasetIcon" Property="Visibility" Value="Hidden" />
+                                <Setter TargetName="DatasetDescription" Property="Visibility" Value="Hidden" />
+                            </DataTrigger>-->
+
+                            <!-- This trigger fires for the selected item (ie the one that's visible when the popup is closed -->
+                            <!--<DataTrigger Binding="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=ComboBoxItem}}" Value="{x:Null}">
+                                <Setter TargetName="DatasetIcon" Property="Visibility" Value="Hidden"/>
+                                <Setter TargetName="DatasetDescription" Property="Visibility" Value="Hidden"/>
+                            </DataTrigger>-->
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+
+            </ComboBox>
+        </StackPanel>
+
+        <!-- Dates controls -->
+        <StackPanel Grid.Row="3" 
                     Margin="5">
 
             <!-- Dates heading-->

@@ -39,9 +39,6 @@ namespace ArcDEA
             // TODO: do all your populate list functions here
             // its how esri do it
 
-            // Initialise dockpanel tabs
-            PrimaryMenuList.Add(new TabControl() { Text = "Landsat", Tooltip = "Landsat Products" });
-            PrimaryMenuList.Add(new TabControl() { Text = "Sentinel", Tooltip = "Sentinel Products" });
         }
         #endregion
 
@@ -70,41 +67,6 @@ namespace ArcDEA
                 LayersRemovedEvent.Subscribe(OnLayerRemoved);
             });
         }
-
-        #region tabs (to be finished)
-        // TODO: finish this
-        // https://github.com/Esri/arcgis-pro-sdk-community-samples/tree/master/Framework/CustomCatalog
-        // DockPanel with header and a stackpanel binding to panel1, panel2
-        // in dockpanel with header vm, set current page to panel based on tab clicked
-        // panels are defined in a folder seperately as one xaml and cs each.
-        private List<TabControl> _primaryMenuList = new List<TabControl>();
-        public List<TabControl> PrimaryMenuList
-        {
-            get { return _primaryMenuList; }
-        }
-        private int _selectedPanelHeaderIndex = 0;
-        public int SelectedPanelHeaderIndex
-        {
-            get { return _selectedPanelHeaderIndex; }
-            set
-            {
-                SetProperty(ref _selectedPanelHeaderIndex, value, () => SelectedPanelHeaderIndex);
-                //if (_selectedPanelHeaderIndex == 0)
-                    //CurrentPage = _paneH1VM;
-                //if (_selectedPanelHeaderIndex == 1)
-                    //CurrentPage = _paneH2VM;
-            }
-        }
-        //private PanelViewModelBase _currentPage;
-        //public PanelViewModelBase CurrentPage
-        //{
-        //    get { return _currentPage; }
-        //    set
-        //    {
-        //        SetProperty(ref _currentPage, value, () => CurrentPage);
-        //    }
-        //}
-        #endregion
 
         #region QueryArea controls
         /// <summary>
@@ -217,6 +179,29 @@ namespace ArcDEA
             }
         }
         #endregion
+
+        #region QueryDataset controls
+        /// <summary>
+        /// Observable list of available query datasets on contents pane.
+        /// </summary>
+        private List<Helpers.DatasetItem> _queryDatasets = Helpers.PopulateDatasetItems();
+        public List<Helpers.DatasetItem> QueryDatasets
+        {
+            get { return _queryDatasets; }
+            set { SetProperty(ref _queryDatasets, value, () => QueryDatasets); }
+        }
+
+        /// <summary>
+        /// Selected query dataset from combobox.
+        /// </summary>
+        private Helpers.DatasetItem _selectedQueryDataset;
+        public Helpers.DatasetItem SelectedDataset
+        {
+            get { return _selectedQueryDataset; }
+            set { SetProperty(ref _selectedQueryDataset, value, () => SelectedDataset); }
+        }
+        #endregion
+
 
         #region QueryDates controls
         /// <summary>

@@ -15,6 +15,25 @@ namespace ArcDEA.Classes
     {
         #region DockPane control data structures
         /// <summary>
+        /// Class to hold dataset information and track selections.
+        /// </summary>
+        public class DatasetItem
+        {
+            public string IconPath { get; set; }
+            public string Name { get; set; }
+            public string Description { get; set; }
+            public bool IsDatasetSelected { get; set; }
+
+            public DatasetItem(string iconPath, string name, string description, bool isDatasetSelected)
+            {
+                IconPath = iconPath;
+                Name = name;
+                Description = description;
+                IsDatasetSelected = isDatasetSelected;
+            }
+        }
+
+        /// <summary>
         /// Class to hold collection information and track selections.
         /// </summary>
         public class CollectionItem
@@ -86,6 +105,20 @@ namespace ArcDEA.Classes
         #endregion
 
         #region DockPane control populators
+        /// <summary>
+        /// Populate dataset list items on DockPane UI control.
+        /// </summary>
+        public static List<DatasetItem> PopulateDatasetItems()
+        {
+            List <DatasetItem> items = new List<DatasetItem>()
+            {
+                { new DatasetItem(@"Images\BrowseFolder16.png", "Landsat", "Landsat 5, 7 and 8", false) },
+                { new DatasetItem(@"Images\BrowseFolder16.png", "Sentinel", "Sentinel 2A, 2B", false) },
+            };
+
+            return items;
+        }
+
         /// <summary>
         /// Populate collection list items on DockPane UI control.
         /// </summary>

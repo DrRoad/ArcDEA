@@ -559,6 +559,11 @@ namespace ArcDEA
                     // Register GDAL and OGR via custom initialiser
                     Helpers.CustomGdalConfigure();
 
+                    // TODO: this is likely easier to do some other way, but we need proj.db for osr to work either way...
+                    var installFolder = Assembly.GetEntryAssembly().Location.ToString();
+                    installFolder = Path.GetFullPath(Path.Combine(installFolder, @"..\..\"));
+                    OSGeo.OSR.Osr.SetPROJSearchPath(Path.Combine(installFolder, @"Resources\pedata\gdaldata"));
+
                     // Set optimal GDAL configurations
                     OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_UNSAFESSL", "YES");
                     OSGeo.GDAL.Gdal.SetConfigOption("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", "tif");

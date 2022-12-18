@@ -30,11 +30,11 @@ namespace ArcDEA
         /// Enable collections synchronisation.
         /// </summary>
         private static readonly object _lockQueryAreaLayers = new object();
-        //private static readonly object _lockQueryCollections = new object();
+        private static readonly object _lockQueryDatasets = new object();
         protected QuickCaptureViewModel()
         {
             BindingOperations.EnableCollectionSynchronization(QueryAreaLayers, _lockQueryAreaLayers);
-            //BindingOperations.EnableCollectionSynchronization(QueryCollections, _lockQueryCollections);
+            BindingOperations.EnableCollectionSynchronization(QueryDatasets, _lockQueryDatasets);
 
             // TODO: do all your populate list functions here
             // its how esri do it
@@ -86,7 +86,11 @@ namespace ArcDEA
         public GraphicsLayer SelectedQueryAreaLayer
         {
             get { return _selectedQueryAreaLayer; }
-            set { SetProperty(ref _selectedQueryAreaLayer, value, () => SelectedQueryAreaLayer); }
+            set 
+            { 
+                SetProperty(ref _selectedQueryAreaLayer, value, () => SelectedQueryAreaLayer);
+                ShowDatasetsControls = "Visible";
+            }
         }
 
         /// <summary>
@@ -181,8 +185,24 @@ namespace ArcDEA
         #endregion
 
         #region QueryDataset controls
+
+        // 
+        private string _showDatasetsControls = "Collapsed";
+        public string ShowDatasetsControls
+        {
+            get { return _showDatasetsControls; }
+            set { SetProperty(ref _showDatasetsControls, value, () => ShowDatasetsControls); }
+        }
+
+        private string _showSlcOffControl = "Collapsed";
+        public string ShowSlcOffControl
+        {
+            get { return _showSlcOffControl; }
+            set { SetProperty(ref _showSlcOffControl, value, () => ShowSlcOffControl); }
+        }
+
         /// <summary>
-        /// Observable list of available query datasets on contents pane.
+        /// List of available query datasets on contents pane.
         /// </summary>
         private List<Helpers.DatasetItem> _queryDatasets = Helpers.PopulateDatasetItems();
         public List<Helpers.DatasetItem> QueryDatasets
@@ -195,15 +215,44 @@ namespace ArcDEA
         /// Selected query dataset from combobox.
         /// </summary>
         private Helpers.DatasetItem _selectedQueryDataset;
-        public Helpers.DatasetItem SelectedDataset
+        public Helpers.DatasetItem SelectedQueryDataset
         {
             get { return _selectedQueryDataset; }
-            set { SetProperty(ref _selectedQueryDataset, value, () => SelectedDataset); }
+            set 
+            { 
+                SetProperty(ref _selectedQueryDataset, value, () => SelectedQueryDataset);
+
+                // Update collections control
+                if (_selectedQueryDataset != null)
+                {
+                    QueryCollections = Helpers.PopulateCollectionItems(_selectedQueryDataset.Name);
+                    ShowDatesControls = "Visible"; 
+                    ShowCollectionsAndAssetsControls = "Visible";  // TODO: put in if statement check ls or s2, if so, show dates and assets, else just assets
+
+                    if (SelectedQueryDataset.Name == "Landsat")
+                    {
+                        ShowSlcOffControl = "Visible";
+                    }
+                    else
+                    {
+                        ShowSlcOffControl = "Collapsed";
+                    }
+
+                    ShowQualityOptionsControls = "Visible";
+                };
+            }
         }
         #endregion
 
-
         #region QueryDates controls
+        // 
+        private string _showDatesControls = "Hidden";
+        public string ShowDatesControls
+        {
+            get { return _showDatesControls; }
+            set { SetProperty(ref _showDatesControls, value, () => ShowDatesControls); }
+        }
+
         /// <summary>
         /// DateTime of query start date control (default 2015-01-01).
         /// </summary>
@@ -226,10 +275,19 @@ namespace ArcDEA
         #endregion
 
         #region QueryCollection controls
+        // 
+        private string _showCollectionsAndAssetsControls = "Hidden";
+        public string ShowCollectionsAndAssetsControls
+        {
+            get { return _showCollectionsAndAssetsControls; }
+            set { SetProperty(ref _showCollectionsAndAssetsControls, value, () => ShowCollectionsAndAssetsControls); }
+        }
+
+
         /// <summary>
         /// List of available DEA data collections.
         /// </summary>
-        private List<Helpers.CollectionItem> _queryCollections = Helpers.PopulateCollectionItems();
+        private List<Helpers.CollectionItem> _queryCollections = null; //Helpers.PopulateCollectionItems();
         public List<Helpers.CollectionItem> QueryCollections
         {
             get { return _queryCollections; }
@@ -313,6 +371,14 @@ namespace ArcDEA
         #endregion
 
         #region QueryMaskValues controls
+        // 
+        private string _showQualityOptionsControls = "Hidden";
+        public string ShowQualityOptionsControls
+        {
+            get { return _showQualityOptionsControls; }
+            set { SetProperty(ref _showQualityOptionsControls, value, () => ShowQualityOptionsControls); }
+        }
+
         // TODO: rethink name for maskvalues
         /// <summary>
         /// List of available quality fmask values for current DEA data collection.
@@ -443,18 +509,18 @@ namespace ArcDEA
         /// <summary>
         /// Sets whether the progress bar progresses or interminates.
         /// </summary>
-        private bool _isProgressInterminate = false;
-        public bool IsProgressInterminate
+        private bool _isProgressIndeterminate = false;
+        public bool IsProgressIndeterminate
         {
-            get { return _isProgressInterminate; }
-            set { SetProperty(ref _isProgressInterminate, value, () => IsProgressInterminate); }
+            get { return _isProgressIndeterminate; }
+            set { SetProperty(ref _isProgressIndeterminate, value, () => IsProgressIndeterminate); }
         }
         public void RefreshProgressBar(int min, int max, string message, bool isInterminate)
         {
             ProgressValue = min;
             MaxProgressValue = max;
             ProgressMessage = message;
-            IsProgressInterminate = isInterminate;
+            IsProgressIndeterminate = isInterminate;
         }
         #endregion
 
@@ -469,6 +535,7 @@ namespace ArcDEA
             set { SetProperty(ref _isNotPocessing, value, () => IsNotProcessing); }
         }
         #endregion
+
 
         /// <summary>
         /// Button for running query and obtaining collection data.
@@ -529,7 +596,7 @@ namespace ArcDEA
                     string endDate = QueryEndDate.ToString("yyyy'-'MM'-'dd");
 
                     // Get selected collection (as raw collection name)
-                    string[] collections = QueryCollections.Where(e => e.IsCollectionSelected).Select(e => e.RawName).ToArray();
+                    string[] collections = QueryCollections.Where(e => e.IsSelected).Select(e => e.RawName).ToArray();
                     if (collections.Length == 0)
                     {
                         return;

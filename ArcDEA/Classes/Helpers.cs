@@ -3,6 +3,7 @@ using ArcGIS.Desktop.Framework.Threading.Tasks;
 using ArcGIS.Desktop.Mapping;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -22,14 +23,14 @@ namespace ArcDEA.Classes
             public string IconPath { get; set; }
             public string Name { get; set; }
             public string Description { get; set; }
-            public bool IsDatasetSelected { get; set; }
+            public bool IsSelected { get; set; }
 
-            public DatasetItem(string iconPath, string name, string description, bool isDatasetSelected)
+            public DatasetItem(string iconPath, string name, string description, bool isSelected)
             {
                 IconPath = iconPath;
                 Name = name;
                 Description = description;
-                IsDatasetSelected = isDatasetSelected;
+                IsSelected = isSelected;
             }
         }
 
@@ -40,13 +41,13 @@ namespace ArcDEA.Classes
         {
             public string RawName { get; set; }
             public string CleanName { get; set; }
-            public bool IsCollectionSelected { get; set; }
+            public bool IsSelected { get; set; }
 
-            public CollectionItem(string rawName, string cleanName, bool isCollectionSelected)
+            public CollectionItem(string rawName, string cleanName, bool isSelected)
             {
                 RawName = rawName;
                 CleanName = cleanName;
-                IsCollectionSelected = isCollectionSelected;
+                IsSelected = isSelected;
             }
         }
 
@@ -110,7 +111,7 @@ namespace ArcDEA.Classes
         /// </summary>
         public static List<DatasetItem> PopulateDatasetItems()
         {
-            List <DatasetItem> items = new List<DatasetItem>()
+            List<DatasetItem> items = new List<DatasetItem>()
             {
                 { new DatasetItem(@"Images\BrowseFolder16.png", "Landsat", "Landsat 5, 7 and 8", false) },
                 { new DatasetItem(@"Images\BrowseFolder16.png", "Sentinel", "Sentinel 2A, 2B", false) },
@@ -122,14 +123,21 @@ namespace ArcDEA.Classes
         /// <summary>
         /// Populate collection list items on DockPane UI control.
         /// </summary>
-        public static List<CollectionItem> PopulateCollectionItems()
+        public static List<CollectionItem> PopulateCollectionItems(string dataset)
         {
-            List<CollectionItem> items = new List<CollectionItem>()
+            List<CollectionItem> items = new List<CollectionItem>();
+
+            if (dataset == "Landsat")
             {
-                { new CollectionItem("ga_ls5t_ard_3", "Landsat 5 TM", false) },
-                { new CollectionItem("ga_ls7e_ard_3", "Landsat 7 ETM+", false) },
-                { new CollectionItem("ga_ls8c_ard_3", "Landsat 8 OLI", true) }
-            };
+                items.Add(new CollectionItem("ga_ls5t_ard_3", "Landsat 5 TM", false));
+                items.Add(new CollectionItem("ga_ls7e_ard_3", "Landsat 7 ETM+", false));
+                items.Add(new CollectionItem("ga_ls8c_ard_3", "Landsat 8 OLI", false));
+            }
+            else if (dataset == "Sentinel")
+            {
+                items.Add(new CollectionItem("testing ", "Sentinel 2A", false));
+                items.Add(new CollectionItem("testing ", "Sentinel 2B", false));
+            }
 
             return items;
         }

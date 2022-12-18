@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using ArcGIS.Desktop.Core.Geoprocessing;
 
 namespace ArcDEA.Classes
 {
@@ -402,6 +403,14 @@ namespace ArcDEA.Classes
                             // Setup translate options, perform translate to subset bands, export as GeoTiff
                             OSGeo.GDAL.GDALTranslateOptions options = new OSGeo.GDAL.GDALTranslateOptions(keepBands.ToArray());
                             OSGeo.GDAL.Gdal.wrapper_GDALTranslate(outputFile, inDS, options, null, null);
+
+
+                            //string outputNc = $"{Date.Year}-{Date.Month}-{Date.Day}.nc";
+                            //string outputNcFile = Path.Combine(outputFolder, outputNc);
+                            //var args = Geoprocessing.MakeValueArray(outputFile, outputNcFile);
+                            //var result = Geoprocessing.ExecuteToolAsync("RasterToNetCDF", args);
+
+
                         }
                         else
                         {
@@ -420,7 +429,6 @@ namespace ArcDEA.Classes
                 }
             });
         }
-
         public async Task DownloadAndProcessIndexAsync(string outputFolder, string index, List<int> validPixels, bool dropMaskBand)
         {
             // TODO: take user nodatavalue

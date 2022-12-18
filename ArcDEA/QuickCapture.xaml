@@ -16,499 +16,520 @@
     </ResourceDictionary>
   </UserControl.Resources>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+    <DockPanel Margin="5"
+               LastChildFill="false" 
+               KeyboardNavigation.TabNavigation="Local">
 
-        <!-- Dockpanel heading -->
-        <DockPanel Grid.Row="0" 
-                   Height="30" 
-                   Margin="5,0,0,0"
-                   LastChildFill="true" 
-                   KeyboardNavigation.TabNavigation="Local" >
+        <!-- Main control panel -->
+        <StackPanel DockPanel.Dock="Top" Margin="2,0,2,0">
             
-            <!--new-->
-            <!--<ListBox x:Name="primaryNavigator" 
-                     VerticalAlignment="Top"
-                     Style="{DynamicResource Esri_ListBoxPanelIndicator}"
-                     ItemsSource="{Binding PrimaryMenuList}" 
-                     SelectedIndex="{Binding SelectedPanelHeaderIndex, Mode=TwoWay}"
-                     IsSynchronizedWithCurrentItem="True"/>-->
-        </DockPanel>
-
-        <!-- Query area controls -->
-        <StackPanel Grid.Row="1" 
-                    Margin="5">
-
-            <!-- Query area heading-->
-            <TextBlock Name="TxbQueryAreaHeading" 
-                       Margin="0,0,0,2" 
-                       Style="{DynamicResource Esri_TextBlockH3}"
-                       Text="Query Area">
-            </TextBlock>
-
-            <!-- Query area grid-->
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="20"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Query area combobox-->
-                <ComboBox Name="CbxQueryAreas" 
-                          Grid.Column="0" 
-                          Margin="0,0,5,0" 
-                          ItemsSource="{Binding QueryAreaLayers}" 
-                          SelectedItem="{Binding SelectedQueryAreaLayer, Mode=TwoWay}"
-                          IsEnabled="{Binding IsNotProcessing}">
-                </ComboBox>
-
-                <!-- Query area new button-->
-                <Button Name="BtnCreateQueryArea" 
-                        Grid.Column="1" 
-                        Width="20"
-                        Height="20"
-                        BorderBrush="Transparent"
-                        Command="{Binding CmdDrawQueryArea}"
-                        IsEnabled="{Binding IsNotProcessing}"
-                        ToolTip="Draw new query area">
-                    <Image Source="pack://application:,,,/ArcDEA;component/Images/DrawNewQueryArea16.png" 
-                           Width="16" 
-                           Height="16">
-                    </Image>
-                </Button>
-            </Grid>
-        </StackPanel>
-
-        <!-- Dataset controls -->
-        <StackPanel Grid.Row="2" 
-                    Margin="5">
-
-            <!-- Dataset heading-->
-            <TextBlock Name="TxbQueryDataset" 
-                       Margin="0,0,0,2" 
-                       Style="{DynamicResource Esri_TextBlockH3}"
-                       Text="Dataset">
-            </TextBlock>
-
-            <!--  combobox-->
-            <!--ItemsSource="{Binding QueryDataset}" -->
-            <!--Height="21.96"-->
-            <ComboBox Name="CbxDataset" 
-                      Grid.Column="0" 
-                      Text="Landsat"
-                      ItemsSource="{Binding QueryDatasets}" 
-                      SelectedItem="{Binding SelectedQueryDataset, Mode=TwoWay}"  
-                      IsEnabled="{Binding IsNotProcessing}">
-
-                <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel x:Name="DatasetStackOutter"
-                                    Margin="5" 
-                                    Orientation="Horizontal">
-                            <Image x:Name="DatasetIcon" Height="32" Source="{Binding IconPath}"></Image>
-                            <StackPanel x:Name="DatasetStackInner"
-                                        Margin="10,0,0,0">
-                                <TextBlock x:Name="DatasetName"
-                                           Text="{Binding Name}"
-                                           VerticalAlignment="Center"
-                                           Style="{DynamicResource Esri_TextBlockH4}"/>
-                                <TextBlock x:Name="DatasetDescription"
-                                           Text="{Binding Description}" 
-                                           VerticalAlignment="Center"
-                                           Style="{DynamicResource Esri_TextBlockH6}"/>
-                            </StackPanel>
-                        </StackPanel>
-
-                        <DataTemplate.Triggers>
-
-                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType={x:Type ComboBoxItem}}}" Value="{x:Null}">
-                                <Setter TargetName="DatasetIcon" Property="Visibility" Value="Collapsed"/>
-                                <Setter TargetName="DatasetDescription" Property="Visibility" Value="Collapsed"/>
-                                <Setter TargetName="DatasetStackOutter" Property="Margin" Value="0"/>
-                                <Setter TargetName="DatasetStackInner" Property="Margin" Value="0,0,0,0"/>
-                                <Setter TargetName="DatasetName" Property="Style" Value="{DynamicResource Esri_TextBlockH5}"/>
-                            </DataTrigger>
-
-
-                            <!-- This trigger fires for the selected item in the drop-down list -->
-                            <!--<DataTrigger Binding="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=ComboBoxItem}, Path=IsSelected}" Value="True">
-                                <Setter TargetName="DatasetIcon" Property="Visibility" Value="Hidden" />
-                                <Setter TargetName="DatasetDescription" Property="Visibility" Value="Hidden" />
-                            </DataTrigger>-->
-
-                            <!-- This trigger fires for the selected item (ie the one that's visible when the popup is closed -->
-                            <!--<DataTrigger Binding="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=ComboBoxItem}}" Value="{x:Null}">
-                                <Setter TargetName="DatasetIcon" Property="Visibility" Value="Hidden"/>
-                                <Setter TargetName="DatasetDescription" Property="Visibility" Value="Hidden"/>
-                            </DataTrigger>-->
-                        </DataTemplate.Triggers>
-                    </DataTemplate>
-                </ComboBox.ItemTemplate>
-
-            </ComboBox>
-        </StackPanel>
-
-        <!-- Dates controls -->
-        <StackPanel Grid.Row="3" 
-                    Margin="5">
-
-            <!-- Dates heading-->
-            <TextBlock Name="TxbDatesHeading" 
-                       Margin="0,0,0,2" 
-                       Style="{DynamicResource Esri_TextBlockH3}"
-                       Text="Date Range">
-            </TextBlock>
-
-            <!-- Dates grid-->
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="5*"/>
-                    <ColumnDefinition Width="1*"/>
-                    <ColumnDefinition Width="5*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Start date combobox-->
-                <DatePicker Name="DateSetStartDate" 
-                            Grid.Column="0"  
-                            SelectedDate="{Binding QueryStartDate}"
-                            IsEnabled="{Binding IsNotProcessing}">
-                    <DatePicker.Resources>
-                        <Style TargetType="DatePickerTextBox">
-                            <Setter Property="VerticalAlignment" Value="Center" />
-                        </Style>
-                    </DatePicker.Resources>
-                </DatePicker>
-
-                <!-- Dates seperator-->
-                <TextBlock Name="TxbDatesSeperator" 
-                           Grid.Column="1" 
-                           VerticalAlignment="Center" 
-                           HorizontalAlignment="Center"
-                           Style="{DynamicResource Esri_TextBlockRegular}"
-                           Text="to">
-                </TextBlock>
-
-                <!-- End date combobox-->
-                <DatePicker Name="DateSetEndDate" 
-                            Grid.Column="2"  
-                            SelectedDate="{Binding QueryEndDate}"
-                            IsEnabled="{Binding IsNotProcessing}">
-                    <DatePicker.Resources>
-                        <Style TargetType="DatePickerTextBox">
-                            <Setter Property="VerticalAlignment" Value="Center" />
-                        </Style>
-                    </DatePicker.Resources>
-                </DatePicker>
-            </Grid>
-        </StackPanel>
-
-        <!-- Collection controls -->
-        <StackPanel Grid.Row="3" 
-                    Margin="5">
-
-            <!-- Collection heading-->
-            <TextBlock Name="TxbCollectionHeading" 
-                       Margin="0,0,0,2" 
-                       Style="{DynamicResource Esri_TextBlockH3}"
-                       Text="Collection">
-            </TextBlock>
-
-            <!-- Collection list-->
-            <ListBox Name="LbxCollections"
-                     MinHeight="60"
-                     MaxHeight="140"
-                     SelectionMode="Multiple" 
-                     ItemsSource="{Binding QueryCollections}"
-                     IsEnabled="{Binding IsNotProcessing}">
-
-                <ListBox.ItemContainerStyle>
-                    <Style TargetType="ListBoxItem">
-                        <Setter Property="IsSelected" Value="{Binding IsCollectionSelected}"/>
-                    </Style>
-                </ListBox.ItemContainerStyle>
-
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Orientation="Horizontal">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="130"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                            
-                                <!-- Collection item checkbox -->
-                                <CheckBox Grid.Column="0" 
-                                          Content="{Binding CleanName}" 
-                                          IsChecked="{Binding IsSelected, Mode=OneWay, RelativeSource={RelativeSource AncestorType=ListBoxItem, Mode=FindAncestor}}"
-                                          Focusable="False"
-                                          IsHitTestVisible="False"
-                                          IsEnabled="{Binding IsNotProcessing}"/>
-
-                                <!-- Collection item checkbox -->
-                                <TextBlock Grid.Column="1" 
-                                           Text="{Binding RawName, StringFormat='({0})'}"/>
-                            </Grid>
-                        </StackPanel>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-        
-            <!-- SLC -->
-            <CheckBox Name="CbxIncludeSlcOff"
-                      Margin="6,5,0,0"
-                      Content="Include SLC-off data"
-                      Focusable="False"
-                      IsHitTestVisible="True"
-                      IsChecked="{Binding QueryIncludeSlcOff}"
-                      IsEnabled="{Binding IsNotProcessing}">
-            </CheckBox>
-            
-            <!-- Provisional -->
-            <!-- TODO -->
-        
-        </StackPanel>
-
-        <!-- Assets tab controls -->
-        <StackPanel Grid.Row="4" 
-                    Margin="10" 
-                    Background="Transparent">
-
-            <!-- Assets heading-->
-            <TextBlock Name="TxbAssetsHeading" Margin="0,0,0,5" 
-                       Style="{DynamicResource Esri_TextBlockRegular}"
-                       Text="Assets">
-            </TextBlock>
-
-            <!-- Asset tab control-->
-            <TabControl Grid.Row="4"
-                        MinHeight="100"
-                        MaxHeight="300"
-                        SelectedIndex="{Binding SelectedAssetTabIndex}"
+            <!-- Query area controls -->
+            <StackPanel Name="QueryAreaControls"
+                        Margin="0,0,0,4"
                         IsEnabled="{Binding IsNotProcessing}">
 
-                <!-- Raw Assets Tab and Listbox -->
-                <TabItem Header="Raw">
-                    
-                    <ListBox Name="LbxRawAssets" 
-                     Margin="0,0,0,0" 
-                     MinHeight="50"
-                     MaxHeight="150"
-                     SelectionMode="Multiple" 
-                     ItemsSource="{Binding QueryRawAssets}">
+                <!-- Query area heading -->
+                <TextBlock Name="TxbQueryAreaHeading"
+                           Margin="0" 
+                           Text="Query Area"
+                           Style="{DynamicResource Esri_TextBlockRegular}">
+                </TextBlock>
 
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="IsSelected" Value="{Binding IsRawAssetSelected}"></Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
+                <!-- Query area grid -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="21.96"/>
+                    </Grid.ColumnDefinitions>
 
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="75"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
+                    <!-- Query area combobox-->
+                    <ComboBox Name="CbxQueryAreas" 
+                              Grid.Column="0"
+                              Margin="0,0,5,0"
+                              ItemsSource="{Binding QueryAreaLayers}" 
+                              SelectedItem="{Binding SelectedQueryAreaLayer, Mode=TwoWay}"/>
 
-                                        <CheckBox Grid.Column="0" 
-                                          Content="{Binding CleanName}" 
-                                          IsChecked="{Binding IsSelected, Mode=OneWay, RelativeSource={RelativeSource AncestorType=ListBoxItem, Mode=FindAncestor}}"
-                                          Focusable="False"
-                                          IsHitTestVisible="False"/>
+                    <!-- Query area new button-->
+                    <Button Name="BtnCreateQueryArea"
+                            Grid.Column="1"
+                            Width="21.96"
+                            Command="{Binding CmdDrawQueryArea}"
+                            BorderBrush="Transparent"
+                            ToolTip="Draw a new query area.">
 
-                                        <TextBlock Grid.Column="1" Text="{Binding RawName, StringFormat='({0})'}"/>
-                                    </Grid>
+                        <!-- Query area new button icon-->
+                        <Image Source="pack://application:,,,/ArcDEA;component/Images/DrawNewQueryArea16.png" 
+                               Width="16" 
+                               Height="16"/>
+                    </Button>
+                </Grid>
+            </StackPanel>
+
+            <!-- Dataset controls -->
+            <StackPanel Name="DatasetControls" 
+                        Margin="0,0,0,4"
+                        IsEnabled="{Binding IsNotProcessing}"
+                        Visibility="{Binding ShowDatasetsControls}">
+
+                <!-- Dataset heading -->
+                <TextBlock Name="TxbDatasetHeading"
+                           Margin="0" 
+                           Text="Dataset"
+                           Style="{DynamicResource Esri_TextBlockRegular}"/>
+
+                <!-- Dataset combobox -->
+                <ComboBox Name="CbxDataset" 
+                          ItemsSource="{Binding QueryDatasets}" 
+                          SelectedItem="{Binding SelectedQueryDataset, Mode=TwoWay}">
+
+                    <!-- Dataset custom item -->
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+
+                            <!-- Dataset item template-->
+                            <StackPanel x:Name="DatasetStackOutter"
+                                        Margin="5" 
+                                        Orientation="Horizontal">
+                                <Image x:Name="DatasetIcon" 
+                                       Height="32" 
+                                       Source="{Binding IconPath}"/>
+                                <StackPanel x:Name="DatasetStackInner"
+                                            Margin="10,0,0,0">
+                                    <TextBlock x:Name="DatasetName"
+                                               Text="{Binding Name}"
+                                               VerticalAlignment="Center"
+                                               Style="{DynamicResource Esri_TextBlockH4}"/>
+                                    <TextBlock x:Name="DatasetDescription"
+                                               Text="{Binding Description}" 
+                                               VerticalAlignment="Center"
+                                               Style="{DynamicResource Esri_TextBlockH6}"/>
                                 </StackPanel>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </TabItem>
+                            </StackPanel>
 
-                <!-- Index Assets Tab and Listbox -->
-                <TabItem Header="Index">
-                    
-                    <ListBox Name="LbxIndexAssets" 
-                     Margin="0,0,0,0" 
-                     MinHeight="50"
-                     MaxHeight="150"
-                     SelectionMode="Single" 
-                     ItemsSource="{Binding QueryIndexAssets}">
-
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="IsSelected" Value="{Binding IsIndexAssetSelected}"></Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="75"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <CheckBox Grid.Column="0" 
-                                          Content="{Binding ShortName}" 
-                                          IsChecked="{Binding IsSelected, Mode=OneWay, RelativeSource={RelativeSource AncestorType=ListBoxItem, Mode=FindAncestor}}"
-                                          Focusable="False"
-                                          IsHitTestVisible="False"/>
-
-                                        <TextBlock Grid.Column="1" Text="{Binding LongName, StringFormat='({0})'}"/>
-                                    </Grid>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </TabItem>
-
-                <!-- Calculator Assets Tab and Listbox -->
-                <TabItem Header="Calculator">
-                    <Label Content="Create your own indices list..." />
-                </TabItem>
-
-            </TabControl>
-        </StackPanel>
-
-        <!-- Expander containing mask values, max invalid-->
-        <Expander Grid.Row="5"
-                  Margin="5,5,5,5" 
-                  Header="Quality"
-                  IsExpanded="False"
-                  Background="Transparent">
-
-            <StackPanel Margin="5,0,5,0">
-                
-                <!-- Mask values controls -->
-                <StackPanel Margin="0,5,0,5">
-
-                    <!-- Mask values heading-->
-                    <TextBlock Name="TxbQualityHeading" Margin="0,0,0,5" 
-                       Style="{DynamicResource Esri_TextBlockRegular}"
-                       Text="Mask Values">
-                    </TextBlock>
-
-                    <!-- Mask values list-->
-                    <ListBox Name="LbxMaskValues" 
-                     Margin="0,0,0,0" 
-                     MinHeight="50"
-                     MaxHeight="150"
-                     SelectionMode="Multiple" 
-                     ItemsSource="{Binding QueryMaskValues}">
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="IsSelected" Value="{Binding IsMaskValueSelected}"></Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="115"/>
-                                            <ColumnDefinition Width="100"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <CheckBox Grid.Column="0" 
-                                          Content="{Binding Label}" 
-                                          IsChecked="{Binding IsSelected, Mode=OneWay, RelativeSource={RelativeSource AncestorType=ListBoxItem, Mode=FindAncestor}}"
-                                          Focusable="False"
-                                          IsHitTestVisible="False"/>
-
-                                        <TextBlock Grid.Column="1" Text="{Binding Value, StringFormat='({0})'}"/>
-                                    </Grid>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </StackPanel>
-
-                <!-- Cloud cover controls -->
-                <StackPanel Margin="0,5,0,5">
-
-                    <!-- Cloud cover heading-->
-                    <TextBlock Name="TxbCloudCoverHeading" 
-                       Margin="0,5,0,5" 
-                       Style="{DynamicResource Esri_TextBlockRegular}"
-                       Text="Maximum Invalid">
-                    </TextBlock>
-
-                    <!-- Slider bar and value grid-->
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="8*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Cloud cover slider-->
-                        <Slider Name="SldCloudCover"
-                        Grid.Column="0"
-                        Margin="0,0,5,0"
-                        Minimum="0"
-                        Maximum="100"
-                        Value="{Binding QueryCloudCover}"
-                        TickFrequency="5" 
-                        IsSnapToTickEnabled="True">
-                            <!--<ItemContainerStyle="{DynamicResource Esri_ListBoxItemHighlightBrush}" -->
-                        </Slider>
-
-                        <!-- Cloud cover value box-->
-                        <TextBlock Name="TxbCloudCoverValue" 
-                           Grid.Column="1"
-                           Margin="5,0,0,0" 
-                           Style="{DynamicResource Esri_TextBlockRegular}"
-                           Text="{Binding ElementName=SldCloudCover, Path=Value, UpdateSourceTrigger=PropertyChanged, StringFormat={}{0}%}"
-                           TextAlignment="Right">
-                        </TextBlock>
-                    </Grid>
-                </StackPanel>
+                            <!-- Dataset item trigger -->
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType={x:Type ComboBoxItem}}}" Value="{x:Null}">
+                                    <Setter TargetName="DatasetIcon" Property="Visibility" Value="Collapsed"/>
+                                    <Setter TargetName="DatasetDescription" Property="Visibility" Value="Collapsed"/>
+                                    <Setter TargetName="DatasetStackOutter" Property="Margin" Value="0"/>
+                                    <Setter TargetName="DatasetStackInner" Property="Margin" Value="0,0,0,0"/>
+                                    <Setter TargetName="DatasetName" Property="Style" Value="{DynamicResource Esri_TextBlockH5}"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
 
             </StackPanel>
 
-        </Expander>
+            <!-- Dates controls -->
+            <StackPanel Name="DatesControls"
+                        Margin="0,0,0,4"
+                        IsEnabled="{Binding IsNotProcessing}"
+                        Visibility="{Binding ShowDatesControls}">
 
-        <!-- Output folder controls -->
-        <StackPanel Grid.Row="6" 
-                    Margin="10" 
-                    Background="Transparent"
-                    IsEnabled="{Binding IsNotProcessing}">
+                <!-- Dates heading-->
+                <TextBlock Name="TxbDatesHeading" 
+                           Margin="0" 
+                           Text="Date Range"
+                           Style="{DynamicResource Esri_TextBlockRegular}"/>
+
+                <!-- Dates grid-->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="5*"/>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="5*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Start date combobox-->
+                    <DatePicker Name="DateSetStartDate" 
+                                Grid.Column="0"
+                                SelectedDate="{Binding QueryStartDate}">
+                        
+                        <!-- Start date styling -->
+                        <DatePicker.Resources>
+                            <Style TargetType="DatePickerTextBox">
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                            </Style>
+                        </DatePicker.Resources>
+                    </DatePicker>
+
+                    <!-- Dates seperator-->
+                    <TextBlock Grid.Column="1" 
+                               VerticalAlignment="Center" 
+                               HorizontalAlignment="Center"
+                               Style="{DynamicResource Esri_TextBlockRegular}"
+                               Text="to"/>
+
+                    <!-- End date combobox-->
+                    <DatePicker Name="DateSetEndDate" 
+                            Grid.Column="2"  
+                            SelectedDate="{Binding QueryEndDate}">
+
+                        <!-- End date styling -->
+                        <DatePicker.Resources>
+                            <Style TargetType="DatePickerTextBox">
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                            </Style>
+                        </DatePicker.Resources>
+                    </DatePicker>
+                </Grid>
+
+            </StackPanel>
+
+            <!-- Collections and assets expander-->
+            <Expander Name="ExpCollectionsAndAssets"
+                      Header="Collections and Assets"
+                      Margin="-4,8,0,0"
+                      IsExpanded="True"
+                      IsEnabled="{Binding IsNotProcessing}"
+                      Visibility="{Binding ShowCollectionsAndAssetsControls}">
+
+                <!-- Collections and assets container -->
+                <StackPanel>
+
+                    <!-- Collection controls -->
+                    <StackPanel Name="CollectionControls" 
+                                Margin="4,0,0,4">
+
+                        <!-- Collection heading-->
+                        <TextBlock Name="TxbCollectionsHeading" 
+                                   Margin="0" 
+                                   Text="Collections"
+                                   Style="{DynamicResource Esri_TextBlockRegular}"/>
+
+                        <!-- Collection listview -->
+                        <ListView Name="LvwCollections"
+                                  MinHeight="60"
+                                  MaxHeight="120"
+                                  SelectionMode="Multiple" 
+                                  ItemsSource="{Binding QueryCollections}">
+
+                            <!-- Collection listview columns and template -->
+                            <ListView.View>
+                                <GridView AllowsColumnReorder="False">
+                                    <GridViewColumn Width="28">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Focusable="False" 
+                                                          IsChecked="{Binding Path=IsSelected, Mode=TwoWay}"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+
+                                    <GridViewColumn Header="Name" 
+                                                    Width="110"
+                                                    DisplayMemberBinding="{Binding Path=CleanName}"/>
+
+                                    <GridViewColumn Header="Collection" 
+                                                    Width="110"
+                                                    DisplayMemberBinding="{Binding Path=RawName}"/>
+                                </GridView>
+                            </ListView.View>
+
+                            <!-- Collection listview item template -->
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="{x:Type ListViewItem}">
+                                                <Border Padding="2"
+                                                        Background="{TemplateBinding Background}">
+                                                    <GridViewRowPresenter Columns="{TemplateBinding GridView.ColumnCollection}" 
+                                                                          Content="{TemplateBinding Content}"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#e5f3fb"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                        </ListView>
+
+                        <!-- Slc on/off checkbox-->
+                        <CheckBox Name="CbxIncludeSlcOff"
+                                  Margin="0,4,0,0"
+                                  Content="Include SLC-off data"
+                                  Focusable="False"
+                                  IsHitTestVisible="True"
+                                  IsChecked="{Binding QueryIncludeSlcOff}"
+                                  IsEnabled="{Binding IsNotProcessing}" 
+                                  Visibility="{Binding ShowSlcOffControl}"/>
+                    </StackPanel>
+
+                    <!-- Assets tab controls -->
+                    <StackPanel Name="AssetControls"
+                                Margin="4,0,0,4">
+
+                        <!-- Assets heading-->
+                        <TextBlock Name="TxbAssetsHeading" 
+                                   Margin="0" 
+                                   Text="Assets"
+                                   Style="{DynamicResource Esri_TextBlockRegular}"/>
+
+                        <!-- Asset tab control-->
+                        <TabControl Name="TabAssets"
+                                    MinHeight="60"
+                                    MaxHeight="240"
+                                    SelectedIndex="{Binding SelectedAssetTabIndex}">
+
+                            <!-- Band assets tab -->
+                            <TabItem Header="Bands">
+
+                                <!-- Band assets listview -->
+                                <ListView Name="LvwAssetsBands"
+                                          SelectionMode="Multiple"
+                                          ItemsSource="{Binding QueryRawAssets}">
+
+                                    <!-- Band assets listview columns and template -->
+                                    <ListView.View>
+                                        <GridView AllowsColumnReorder="False">
+                                            <GridViewColumn Width="28">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <CheckBox Focusable="False" 
+                                                                  IsChecked="{Binding Path=IsRawAssetSelected, Mode=TwoWay}"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+
+                                            <GridViewColumn Header="Name" 
+                                                            Width="110"
+                                                            DisplayMemberBinding="{Binding Path=CleanName}"/>
+
+                                            <GridViewColumn Header="Asset"
+                                                            Width="110"
+                                                            DisplayMemberBinding="{Binding Path=RawName}"/>
+                                        </GridView>
+                                    </ListView.View>
+
+                                    <!-- Band assets listview item template -->
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="IsSelected" Value="{Binding IsRawAssetSelected, Mode=TwoWay}"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="{x:Type ListViewItem}">
+                                                        <Border Padding="2"
+                                                                Background="{TemplateBinding Background}">
+                                                            <GridViewRowPresenter Columns="{TemplateBinding GridView.ColumnCollection}"
+                                                                                  Content="{TemplateBinding Content}"/>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="Background" Value="#e5f3fb"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                </ListView>
+                            </TabItem>
+
+                            <!-- Indices assets tab -->
+                            <TabItem Header="Indices">
+
+                                <!-- Indices assets listview -->
+                                <ListView Name="LvwAssetsIndices"
+                                          SelectionMode="Single"
+                                          ItemsSource="{Binding QueryIndexAssets}">
+
+                                    <!-- Indices assets listview columns and template -->
+                                    <ListView.View>
+                                        <GridView AllowsColumnReorder="False">
+                                            <GridViewColumn Width="28">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <CheckBox Focusable="False" 
+                                                                  IsChecked="{Binding Path=IsIndexAssetSelected, Mode=TwoWay}"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+
+                                            <GridViewColumn Header="Name" 
+                                                            Width="110"
+                                                            DisplayMemberBinding="{Binding Path=ShortName}"/>
+
+                                            <GridViewColumn Header="Asset"
+                                                            Width="110"
+                                                            DisplayMemberBinding="{Binding Path=LongName}"/>
+                                        </GridView>
+                                    </ListView.View>
+
+                                    <!-- Indices assets listview item template -->
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="IsSelected" Value="{Binding IsIndexAssetSelected, Mode=TwoWay}"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="{x:Type ListViewItem}">
+                                                        <Border Padding="2"
+                                                                Background="{TemplateBinding Background}">
+                                                            <GridViewRowPresenter Columns="{TemplateBinding GridView.ColumnCollection}"
+                                                                                  Content="{TemplateBinding Content}"/>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="Background" Value="#e5f3fb"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                </ListView>
+                            </TabItem>
+
+                            <!-- Calculator assets tab -->
+                            <TabItem Header="Calculator"/>
+
+                        </TabControl>
+                    </StackPanel>
+                </StackPanel>
+            </Expander>
+
+            <!-- Quality options expander-->
+            <Expander Name="ExpQualityOptions"
+                      Header="Quality Options"
+                      Margin="-4,8,0,0"
+                      IsExpanded="False"
+                      IsEnabled="{Binding IsNotProcessing}"
+                      Visibility="{Binding ShowQualityOptionsControls}">
+
+                <!-- Quality options container -->
+                <StackPanel>
+                    
+                    <!-- Mask values controls -->
+                    <StackPanel Name="MaskValuesControls" 
+                                Margin="4,0,0,4">
+
+                        <!-- Mask values heading-->
+                        <TextBlock Name="TxbMaskValuesHeading" 
+                                   Margin="0,0,0,0" 
+                                   Text="Mask Values"
+                                   Style="{DynamicResource Esri_TextBlockRegular}" />
+
+                        <!-- Mask values listbox -->
+                        <ListView Name="LvwMaskValues"
+                                  MinHeight="60"
+                                  MaxHeight="150"
+                                  SelectionMode="Multiple" 
+                                  ItemsSource="{Binding QueryMaskValues}">
+                            
+                            <!-- Mask values columns and template -->
+                            <ListView.View>
+                                <GridView AllowsColumnReorder="False">
+                                    <GridViewColumn Width="28">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Focusable="False" 
+                                                          IsChecked="{Binding Path=IsMaskValueSelected, Mode=TwoWay}"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+
+                                    <GridViewColumn Header="Label" 
+                                                    Width="115"
+                                                    DisplayMemberBinding="{Binding Path=Label}"/>
+
+                                    <GridViewColumn Header="Class ID" 
+                                                    Width="110"
+                                                    DisplayMemberBinding="{Binding Path=Value}"/>
+                                </GridView>
+                            </ListView.View>
+
+                            <!-- Mask values listview item template -->
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="IsSelected" Value="{Binding IsMaskValueSelected, Mode=TwoWay}"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="{x:Type ListViewItem}">
+                                                <Border Padding="2"
+                                                        Background="{TemplateBinding Background}">
+                                                    <GridViewRowPresenter                                                         Columns="{TemplateBinding GridView.ColumnCollection}" 
+                                                        Content="{TemplateBinding Content}"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#e5f3fb"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+
+                        </ListView>
+
+                        <!-- Cloud cover heading-->
+                        <TextBlock Name="TxbCloudCoverHeading" 
+                                   Margin="0,4,0,0" 
+                                   Text="Maximum invalid pixels"
+                                   Style="{DynamicResource Esri_TextBlockRegular}" />
+
+                        <!-- Cloud cover slider and value grid-->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="8*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- Cloud cover slider -->
+                            <Slider Name="SldCloudCover"
+                                    Grid.Column="0"
+                                    Margin="0,0,5,0"
+                                    Minimum="0"
+                                    Maximum="100"
+                                    Value="{Binding QueryCloudCover}"
+                                    TickFrequency="5" 
+                                    IsSnapToTickEnabled="True" />
+
+                            <!-- Cloud cover value box-->
+                            <TextBlock Name="TxbCloudCoverValue" 
+                                       Grid.Column="1"
+                                       Margin="5,0,0,0"
+                                       Text="{Binding ElementName=SldCloudCover, Path=Value, UpdateSourceTrigger=PropertyChanged, StringFormat={}{0}%}"
+                                       TextAlignment="Right"
+                                       Style="{DynamicResource Esri_TextBlockRegular}" />
+
+
+                        </Grid>
+
+                    </StackPanel>
+                </StackPanel>
+            </Expander>
+            
+            
+            
+            
+        </StackPanel>
+
+        <!-- Progress and output control panel -->
+        <StackPanel DockPanel.Dock="Bottom" 
+                    Margin="2,0,2,0">
 
             <!-- Output folder heading-->
             <TextBlock Name="TxbOutputFolderHeading" 
-                       Margin="0,0,0,5" 
-                       Style="{DynamicResource Esri_TextBlockRegular}"
-                       Text="Output Folder">
-            </TextBlock>
+                       Margin="0" 
+                       Text="Output Folder"
+                       Style="{DynamicResource Esri_TextBlockRegular}" />
 
             <!-- Output folder grid-->
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="21.96"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- Output folder path-->
@@ -516,30 +537,25 @@
                          Grid.Column="0" 
                          Margin="0,0,5,0" 
                          Text="{Binding OutputFolderPath}"
-                         Style="{DynamicResource Esri_TextBoxRegular}"
-                         VerticalContentAlignment="Center">
-                </TextBox>
+                         VerticalContentAlignment="Center"
+                         Style="{DynamicResource Esri_TextBoxRegular}" />
 
                 <!-- Output folder select button-->
                 <Button Name="BtnSelectOutputFolder" 
                         Grid.Column="1" 
-                        Margin="0,0,0,0" 
-                        Width="20"
-                        Height="20"
-                        Background="Transparent"
-                        BorderBrush="Transparent"
+                        Width="21.96"
                         Command="{Binding CmdOpenFolderDialog}"
-                        ToolTip="Browse">
-                    <Image Source="Images\BrowseFolder16.png" Width="16" Height="16"/>
+                        BorderBrush="Transparent"
+                        ToolTip="Browse and select output folder">
+
+                    <!-- Output folder select button icon-->
+                    <Image Source="Images\BrowseFolder16.png" 
+                           Width="16" 
+                           Height="16" />
                 </Button>
             </Grid>
-        </StackPanel>
 
-        <!-- Progress bar and run controls -->
-        <StackPanel Grid.Row="7" 
-                    Margin="10" 
-                    VerticalAlignment="Bottom"
-                    Background="Transparent">
+            <!-- Progress bar and process controls -->
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="25"/>
@@ -550,35 +566,32 @@
                     <ColumnDefinition Width="75"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Progress bar-->
+                <!-- Progress bar -->
                 <ProgressBar Name="PrgProgressBar" 
                              Grid.Row="0"
                              Grid.ColumnSpan="2"
-                             Margin="0,0,0,0"  
                              Height = "10"
                              HorizontalAlignment="Stretch"
                              VerticalAlignment="Stretch"
                              Minimum="1"
                              Maximum="{Binding Path=MaxProgressValue, Mode=OneWay}" 
                              Value="{Binding Path=ProgressValue, Mode=OneWay}"  
-                             IsIndeterminate="{Binding Path=IsProgressInterminate, Mode=OneWay}">
-                </ProgressBar>
-                
+                             IsIndeterminate="{Binding Path=IsProgressIndeterminate, Mode=OneWay}" />
+
                 <!-- Progress message and percentage stack -->
                 <StackPanel Grid.Row="1"
                             Grid.Column="0" 
-                            Margin="0,0,0,0"
+                            Margin="0"
                             Orientation="Horizontal">
 
                     <!-- Progress message-->
                     <TextBlock Name="TxtProgressMessage"  
-                           Margin="0,0,0,0"  
+                           Margin="0"  
                            MinWidth="50"
                            VerticalAlignment="Center"
                            Text="{Binding ProgressMessage}" 
                            Style="{DynamicResource Esri_TextBlockRegular}"
-                           Visibility="{Binding IsProcessing}">
-                    </TextBlock>
+                           Visibility="{Binding IsNotProcessing}" />
 
                     <!-- Progress percentage-->
                     <TextBlock Name="TxtProgressPercentage"  
@@ -586,8 +599,7 @@
                            MinWidth="50"
                            VerticalAlignment="Center"
                            Text="{Binding ProgressPercentage}" 
-                           Style="{DynamicResource Esri_TextBlockRegular}">
-                    </TextBlock>
+                           Style="{DynamicResource Esri_TextBlockRegular}" />
                 </StackPanel>
 
                 <!-- Run button-->
@@ -597,9 +609,10 @@
                         Margin="5,0,0,0" 
                         Style="{DynamicResource Esri_Button}" 
                         Content="Run"
-                        Command="{Binding CmdRun}">
-                </Button>
+                        Command="{Binding CmdRun}" />
             </Grid>
+
         </StackPanel>
-    </Grid>
+
+    </DockPanel>
 </UserControl>

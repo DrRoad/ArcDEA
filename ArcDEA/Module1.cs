@@ -1,24 +1,6 @@
-﻿using ArcGIS.Core.CIM;
-using ArcGIS.Core.Data;
-using ArcGIS.Core.Geometry;
-using ArcGIS.Desktop.Catalog;
-using ArcGIS.Desktop.Core;
-using ArcGIS.Desktop.Core.Events;
-using ArcGIS.Desktop.Editing;
-using ArcGIS.Desktop.Extensions;
-using ArcGIS.Desktop.Framework;
+﻿using ArcGIS.Desktop.Framework;
 using ArcGIS.Desktop.Framework.Contracts;
-using ArcGIS.Desktop.Framework.Dialogs;
-using ArcGIS.Desktop.Framework.Threading.Tasks;
-using ArcGIS.Desktop.Layouts;
-using ArcGIS.Desktop.Mapping;
-using ArcGIS.Desktop.Mapping.Events;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Input;
+using ArcDEA.Classes;
 
 namespace ArcDEA
 {
@@ -41,6 +23,28 @@ namespace ArcDEA
             //return false to ~cancel~ Application close
             return true;
         }
+
+
+        protected override bool Initialize()
+        {
+            // Register GDAL and OGR via custom initialiser
+            Helpers.CustomGdalConfigure();
+
+            //// TODO: this is likely easier to do some other way, but we need proj.db for osr to work either way...
+            var installFolder = System.Reflection.Assembly.GetEntryAssembly().Location.ToString();
+            installFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(installFolder, @"..\..\"));
+            OSGeo.OSR.Osr.SetPROJSearchPath(System.IO.Path.Combine(installFolder, @"Resources\pedata\gdaldata"));
+
+            //// Set optimal GDAL configurations
+            OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_UNSAFESSL", "YES");
+            OSGeo.GDAL.Gdal.SetConfigOption("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", "tif");
+            OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_MULTIRANGE", "YES");
+            OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_MERGE_CONSECUTIVE_RANGES", "YES");
+
+            return true;
+        }
+
+
         #endregion Overrides
     }
 }

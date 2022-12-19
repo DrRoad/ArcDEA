@@ -185,8 +185,9 @@ namespace ArcDEA
         #endregion
 
         #region QueryDataset controls
-
-        // 
+        /// <summary>
+        /// Control to show or hide dataset controls when study area set.
+        /// </summary>
         private string _showDatasetsControls = "Collapsed";
         public string ShowDatasetsControls
         {
@@ -194,6 +195,9 @@ namespace ArcDEA
             set { SetProperty(ref _showDatasetsControls, value, () => ShowDatasetsControls); }
         }
 
+        /// <summary>
+        /// Control to show or hide slc-off control when landsat set.
+        /// </summary>
         private string _showSlcOffControl = "Collapsed";
         public string ShowSlcOffControl
         {
@@ -556,26 +560,12 @@ namespace ArcDEA
                     IProgress<int> progressValue = new Progress<int>(e => ProgressValue = e);
                     IProgress<string> progressPercent = new Progress<string>(e => ProgressPercentage = e);
 
-                    // Register GDAL and OGR via custom initialiser
-                    Helpers.CustomGdalConfigure();
-
-                    // TODO: this is likely easier to do some other way, but we need proj.db for osr to work either way...
-                    var installFolder = Assembly.GetEntryAssembly().Location.ToString();
-                    installFolder = Path.GetFullPath(Path.Combine(installFolder, @"..\..\"));
-                    OSGeo.OSR.Osr.SetPROJSearchPath(Path.Combine(installFolder, @"Resources\pedata\gdaldata"));
-
-                    // Set optimal GDAL configurations
-                    OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_UNSAFESSL", "YES");
-                    OSGeo.GDAL.Gdal.SetConfigOption("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", "tif");
-                    OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_MULTIRANGE", "YES");
-                    OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_MERGE_CONSECUTIVE_RANGES", "YES");
-
                     // Get the ArcGIS temporary folder path
                     string tmpFolder = Path.GetTempPath();
 
                     // Set download and processing num cores
                     int availableCores = Environment.ProcessorCount - 1;
-                    availableCores = availableCores * 2; // TODO: temp
+                    //availableCores = availableCores * 2; // TODO: temp
 
                     var numCores = new ParallelOptions { MaxDegreeOfParallelism = availableCores };
                     System.Diagnostics.Debug.WriteLine($"Using {availableCores} cores.");

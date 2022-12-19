@@ -708,34 +708,42 @@ namespace ArcDEA.Classes
 
                 foreach (var feature in Features)
                 {
-                    // Convert collection, datetime to date strings
-                    string collection = feature.Properties.Product.ToString();
-                    string date = feature.Properties.DateTime.ToString("yyyy-MM-dd");
+                    if (feature.Properties.Product != null)
+                    {
+                        // Convert collection, datetime to date strings
+                        string collection = feature.Properties.Product.ToString();
+                        string date = feature.Properties.DateTime.ToString("yyyy-MM-dd");
 
-                    // Create WCS query url (without assets)
-                    string url = "";
-                    url += "https://ows.dea.ga.gov.au/wcs?service=WCS";
-                    url += "&VERSION=1.0.0";
-                    url += "&REQUEST=GetCoverage";
-                    url += "&COVERAGE=" + collection;
-                    url += "&TIME=" + date;
-                    url += "&MEASUREMENTS={*}";
-                    url += "&BBOX=" + bbox;
-                    url += "&CRS=" + epsg;
-                    url += "&RESX=" + resolution;
-                    url += "&RESY=" + resolution;
-                    url += "&FORMAT=GeoTIFF";
+                        // Create WCS query url (without assets)
+                        string url = "";
+                        url += "https://ows.dea.ga.gov.au/wcs?service=WCS";
+                        url += "&VERSION=1.0.0";
+                        url += "&REQUEST=GetCoverage";
+                        url += "&COVERAGE=" + collection;
+                        url += "&TIME=" + date;
+                        url += "&MEASUREMENTS={*}";
+                        url += "&BBOX=" + bbox;
+                        url += "&CRS=" + epsg;
+                        url += "&RESX=" + resolution;
+                        url += "&RESY=" + resolution;
+                        url += "&FORMAT=GeoTIFF";
 
-                    // Create a WCS url for mask and user assets, seperately
-                    Dictionary<string, string> urls = new Dictionary<string, string>()
+                        // Create a WCS url for mask and user assets, seperately
+                        Dictionary<string, string> urls = new Dictionary<string, string>()
                     {
                         {"Mask", url.Replace("{*}", "oa_fmask") },
                         {"Full", url.Replace("{*}", assets) },
                     };
 
-                    // Create new download item and add to downloads
-                    Download download = new Download(feature.Id, feature.Properties.DateTime, urls);
-                    downloads.Add(download);
+                        // Create new download item and add to downloads
+                        Download download = new Download(feature.Id, feature.Properties.DateTime, urls);
+                        downloads.Add(download);
+                    }
+                    else
+                    {
+                        int x = 0;
+                    }
+                    
                 }
             }
 

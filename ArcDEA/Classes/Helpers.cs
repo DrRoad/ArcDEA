@@ -113,7 +113,7 @@ namespace ArcDEA.Classes
         {
             List<DatasetItem> items = new List<DatasetItem>()
             {
-                { new DatasetItem(@"Images\BrowseFolder16.png", "Landsat", "Landsat 5, 7 and 8", false) },
+                { new DatasetItem(@"Images\BrowseFolder16.png", "Landsat", "Landsat 5, 7, 8 and 9", false) },
                 { new DatasetItem(@"Images\BrowseFolder16.png", "Sentinel", "Sentinel 2A, 2B", false) },
             };
 
@@ -132,11 +132,12 @@ namespace ArcDEA.Classes
                 items.Add(new CollectionItem("ga_ls5t_ard_3", "Landsat 5 TM", false));
                 items.Add(new CollectionItem("ga_ls7e_ard_3", "Landsat 7 ETM+", false));
                 items.Add(new CollectionItem("ga_ls8c_ard_3", "Landsat 8 OLI", false));
+                items.Add(new CollectionItem("ga_ls9c_ard_3", "Landsat 9 OLI-2", false));
             }
             else if (dataset == "Sentinel")
             {
-                items.Add(new CollectionItem("testing ", "Sentinel 2A", false));
-                items.Add(new CollectionItem("testing ", "Sentinel 2B", false));
+                items.Add(new CollectionItem("ga_s2am_ard_3", "Sentinel 2A", false));
+                items.Add(new CollectionItem("ga_s2bm_ard_3", "Sentinel 2B", false));
             }
 
             return items;
@@ -145,20 +146,34 @@ namespace ArcDEA.Classes
         /// <summary>
         /// Populate raw-based asset list items on DockPane UI control.
         /// </summary>
-        public static List<AssetRawItem> PopulateRawAssetItems()
+        public static List<AssetRawItem> PopulateRawAssetItems(string dataset)
         {
-            List<AssetRawItem> items = new List<AssetRawItem>()
+            List<AssetRawItem> items = new List<AssetRawItem>();
+
+            if (dataset == "Landsat")
             {
-                { new AssetRawItem("nbart_blue",   "Blue",   false) },
-                { new AssetRawItem("nbart_green",  "Green",  false) },
-                { new AssetRawItem("nbart_red",    "Red",    false) },
-                { new AssetRawItem("nbart_nir",    "NIR",    false) },
-                { new AssetRawItem("nbart_swir_1", "SWIR 1", false) },
-                { new AssetRawItem("nbart_swir_2", "SWIR 2", false) }
-            };
+                items.Add(new AssetRawItem("nbart_blue", "Blue", false));
+                items.Add(new AssetRawItem("nbart_green", "Green", false));
+                items.Add(new AssetRawItem("nbart_red", "Red", false));
+                items.Add(new AssetRawItem("nbart_nir", "NIR", false));
+                items.Add(new AssetRawItem("nbart_swir_1", "SWIR 1", false));
+                items.Add(new AssetRawItem("nbart_swir_2", "SWIR 2", false));
+            }
+            else if (dataset == "Sentinel")
+            {
+                items.Add(new AssetRawItem("nbart_blue", "Blue", false));
+                items.Add(new AssetRawItem("nbart_green", "Green", false));
+                items.Add(new AssetRawItem("nbart_red", "Red", false));
+                items.Add(new AssetRawItem("nbart_red_edge_1", "Red Edge 1", false));
+                items.Add(new AssetRawItem("nbart_red_edge_2", "Red Edge 2", false));
+                items.Add(new AssetRawItem("nbart_red_edge_3", "Red Edge 3", false));
+                items.Add(new AssetRawItem("nbart_nir_1", "NIR 1", false));
+                items.Add(new AssetRawItem("nbart_nir_2", "NIR 2", false));
+                items.Add(new AssetRawItem("nbart_swir_2", "SWIR 2", false));
+                items.Add(new AssetRawItem("nbart_swir_3", "SWIR 3", false));
+            }
 
-            return items;
-
+                return items;
         }
 
         /// <summary>
@@ -287,19 +302,41 @@ namespace ArcDEA.Classes
             }
 
             // Set input bbox epsg
-            OSGeo.OSR.SpatialReference inSrs = new OSGeo.OSR.SpatialReference(null);
-            inSrs.ImportFromEPSG(inEpsg);
+            //OSGeo.OSR.SpatialReference inSrs2 = new OSGeo.OSR.SpatialReference(null);
+            //inSrs2.ImportFromEPSG(inEpsg);
 
             // Set output bbox epsg
-            OSGeo.OSR.SpatialReference outSrs = new OSGeo.OSR.SpatialReference(null);
-            outSrs.ImportFromEPSG(outEpsg);
+            //OSGeo.OSR.SpatialReference outSrs2 = new OSGeo.OSR.SpatialReference(null);
+            //outSrs2.ImportFromEPSG(outEpsg);
 
             // Initialise transformer
-            OSGeo.OSR.CoordinateTransformation transformer = new OSGeo.OSR.CoordinateTransformation(inSrs, outSrs);
+            //OSGeo.OSR.CoordinateTransformation transformer2 = new OSGeo.OSR.CoordinateTransformation(inSrs2, outSrs2);
 
             // Initialise output bbox and project coordinates to output
-            double[] outBoundingBox = new double[4] { 0, 0, 0, 0 };
-            transformer.TransformBounds(outBoundingBox, minX, minY, maxX, maxY, 0);
+            //double[] outBoundingBox2 = new double[4] { 0, 0, 0, 0 };
+            //transformer2.TransformBounds(outBoundingBox2, minX, minY, maxX, maxY, 0);
+
+
+
+            // Creatre input and output srid and build projection transformer
+            SpatialReference inSRID = SpatialReferenceBuilder.CreateSpatialReference(inEpsg);
+            SpatialReference outSRID = SpatialReferenceBuilder.CreateSpatialReference(outEpsg);
+            ProjectionTransformation transformer = ProjectionTransformation.Create(inSRID, outSRID);
+
+            // Build input envelope
+            Envelope inEnvelope = EnvelopeBuilderEx.CreateEnvelope(minY, minX, maxY, maxX, inSRID);
+
+            // Project input envelope
+            Envelope outEnvelope = (Envelope)GeometryEngine.Instance.ProjectEx(inEnvelope, transformer);
+            
+            // Decompose into bounding box
+            double[] outBoundingBox = new double[4] 
+            { 
+                outEnvelope.XMin,
+                outEnvelope.YMin,
+                outEnvelope.XMax,
+                outEnvelope.YMax,
+            };
 
             return outBoundingBox;
         }

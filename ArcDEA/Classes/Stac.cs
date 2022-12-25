@@ -1,491 +1,829 @@
-﻿//using System;
-//using System.Collections.Generic;
-//using System.IO;
-//using System.Linq;
-//using System.Net.Http;
-//using ArcGIS.Desktop.Framework.Threading.Tasks;
-//using System.Text.Json;
-//using System.Text.Json.Serialization;
-//using System.Threading.Tasks;
-//using ArcGIS.Core.Data.Raster;
-//using ArcGIS.Core.Data;
-//using ArcGIS.Core.Threading.Tasks;
-
-//namespace ArcDEA.Classes
-//{
-//    public class Stac
-//    {
-//        public string QueryEndpoint { get; set; }
-//        public string QueryCollection { get; set; }
-//        public string QueryStartDate { get; set; }
-//        public string QueryEndDate { get; set; }
-//        public double[] QueryBoundingBoxWgs84 { get; set; }
-//        public double[] QueryBoundingBoxAlbers { get; set; }
-//        public int QueryLimit { get; set; }
-//        public Root Result { get; set; }
-//        public Dictionary<string, string[]> Wcs { get; set; }
-
-//        public Stac(string collection, string startDate, string endDate, double[] boundingBoxWgs84, double[] boundingBoxAlbers, int limit)
-//        {
-//            QueryEndpoint = "https://explorer.sandbox.dea.ga.gov.au/stac/search?";
-//            QueryCollection = collection;
-//            QueryStartDate = startDate;
-//            QueryEndDate = endDate;
-//            QueryBoundingBoxWgs84 = boundingBoxWgs84;
-//            QueryBoundingBoxAlbers = boundingBoxAlbers;
-//            QueryLimit = limit;
-//            Result = null;
-//            Wcs = null;
-//        }
-
-//        public async Task QueryStacAsync(int timeout)
-//        {
-//            // Convert bounding box array into double array sw, ne
-//            string bbox = string.Join(",", QueryBoundingBoxWgs84);
-
-//            // Construct STAC query url
-//            string url = QueryEndpoint;
-//            url += $"collection={QueryCollection}";
-//            url += $"&time={QueryStartDate}/{QueryEndDate}";
-//            url += $"&bbox=[{bbox}]";
-//            url += $"&limit={QueryLimit}";
-
-//            // Prepare http client
-//            var client = new HttpClient();
-//            client.Timeout = TimeSpan.FromMinutes(timeout);
-
-//            // TODO: try catches
-
-//            // Recursively parse all STAC features based on user request
-//            bool more = true;
-//            while (more)
-//            {
-//                // Get initial list of STAC results for user request
-//                var response = await QueuedTask.Run(() => { return client.GetAsync(url); });
-//                response.EnsureSuccessStatusCode();
-
-//                // Parse content and deserialize json into STAC class
-//                var content = await QueuedTask.Run(() => { return response.Content.ReadAsStringAsync(); });
-//                Root data = JsonSerializer.Deserialize<Root>(content);
-
-//                // On first pass just add, on others, append
-//                if (Result == null)
-//                {
-//                    Result = data;
-//                }
-//                else
-//                {
-//                    Result.Features.AddRange(data.Features);
-//                }
-
-//                // Check if a "next" link exists, iterate and append, else leave
-//                var next = data.Links.Where(e => e.Relative == "next").FirstOrDefault();
-//                if (next != null)
-//                {
-//                    url = next.Href;
-//                }
-//                else
-//                {
-//                    more = false;
-//                }
-//            }
-//        }
-
-//        public void GroupBySolarDay()
-//        {
-//            // Sort by datetime
-//            Result.Features.Sort((a, b) => a.Properties.DateTime.CompareTo(b.Properties.DateTime));
-
-//            // Group by date (without time) and select first date in each group
-//            List<Feature> groupedFeatures = Result.Features.GroupBy(e => e.Properties.DateTime.ToString("yyyy-MM-dd")).Select(e => e.First()).ToList();
-//            Result.Features = groupedFeatures;
-        
-//        }
-
-//        public async Task DropInvalidFeaturesAsync(List<int> validClasses, double minValid)
-//        {
-//            // TODO: check inputs
-//            // TODO: group by solar day functonality
-//            // TODO: move wcs code out to helpers, we use it again elsewhere
-
-//            // Set up dictionary to hold raw and clean date
-//            Dictionary<string, string[]> items = new Dictionary<string, string[]>();
-
-//            // Convert raw dates to STAC-friendly format
-//            var dates = Result.Features.Select(e => e.Properties.DateTime.ToString("yyyy-MM-dd"));  //yyyy-MM-ddThh:mm:ss
-//            dates = dates.Distinct().ToList();
-
-//            // Get Albers bounding box
-//            string bbox = string.Join(",", QueryBoundingBoxAlbers);
-
-//            foreach (string date in dates)
-//            {
-//                // Create WCS query url
-//                string url = "";
-//                url += "https://ows.dea.ga.gov.au/wcs?service=WCS";
-//                url += "&VERSION=1.0.0";
-//                url += "&REQUEST=GetCoverage";
-//                url += "&COVERAGE=ga_ls8c_ard_3";
-//                url += "&TIME=" + date;
-//                url += "&MEASUREMENTS=oa_fmask";
-//                url += "&BBOX=" + bbox;
-//                url += "&CRS=EPSG:3577";
-//                url += "&RESX=30.0";
-//                url += "&RESY=30.0";
-//                url += "&FORMAT=GeoTIFF";
-
-//                // Create new item data structure (url, filename) and add
-//                string[] item = new string[] {url, null};
-//                items.Add(date, item);
-//            }
-
-//            // Get the current temp folder path
-//            string folder = Path.GetTempPath();
-
-//            // Open a HTTP client with 60 minute timeout
-//            var client = new HttpClient();
-//            client.Timeout = TimeSpan.FromMinutes(60);
-
-//            // Create a list of mask downloader tasks
-//            var tasks = new List<Task>();
-//            foreach (var item in items)
-//            {
-//                string date = item.Key;
-//                string url = item.Value[0];
-
-//                tasks.Add(Task.Run(async () => 
-//                {
-//                    // Notify
-//                    System.Diagnostics.Debug.WriteLine($"Started download: {date}");
-
-//                    // Create temporary file path and set Uri
-//                    string filename = Guid.NewGuid().ToString() + ".tif";
-//                    string filepath = Path.Join(folder, filename);
-
-//                    // Query URL and ensure success
-//                    var response = await client.GetAsync(url);
-//                    response.EnsureSuccessStatusCode();
-
-//                    // Download temporary file to temporary folder
-//                    using (FileStream fs = new FileStream(filepath, FileMode.CreateNew))
-//                    {
-//                        await response.Content.CopyToAsync(fs);
-//                    }
-
-//                    // Update filename in current items
-//                    item.Value[1] = filename;
-
-//                    // Notify
-//                    System.Diagnostics.Debug.WriteLine($"Finished download: {date}");
-//                }));
-//            }
-
-//            // Run all download tasks
-//            await Task.WhenAll(tasks);
-
-//            // Iterate items, count percent valid pixels, return invalid dates, all on background threads
-//            List<string> invalidDates = await BackgroundTask.Run(() => {
-
-//                // todo make max degree parallel dynamic
-//                ParallelOptions options = new ParallelOptions();
-//                options.MaxDegreeOfParallelism = 3;  
-
-//                List<string> invalidDates = new List<string>();
-//                Parallel.ForEach(items, options, item => 
-//                { 
-//                    string date = item.Key;
-//                    string url = item.Value[0];
-//                    string filename = item.Value[1];
-//                    string filepath = Path.Join(folder, filename);
-
-//                    // Notify
-//                    System.Diagnostics.Debug.WriteLine($"Started validity check: {date}");
-
-//                    // Create connection to file
-//                    Uri folderUri = new Uri(folder);
-//                    FileSystemConnectionPath conn = new FileSystemConnectionPath(folderUri, FileSystemDatastoreType.Raster);
-//                    FileSystemDatastore store = new FileSystemDatastore(conn);
-
-//                    // Read raster from store
-//                    RasterDataset rasterDataset = store.OpenDataset<RasterDataset>(filename);
-//                    Raster raster = rasterDataset.CreateFullRaster();
-
-//                    // Get a pixel block for quicker reading and read from pixel top left pixel
-//                    PixelBlock block = raster.CreatePixelBlock(raster.GetWidth(), raster.GetHeight());
-//                    raster.Read(0, 0, block);
-
-//                    // Read 2-dimensional pixel values into 1-dimensional byte array
-//                    Array pixels2D = block.GetPixelData(0, false);
-//                    byte[] pixels1D = new byte[pixels2D.Length];
-//                    Buffer.BlockCopy(pixels2D, 0, pixels1D, 0, pixels2D.Length);
-
-//                    // Get distinct pixel values and their counts
-//                    var uniqueCounts = pixels1D.GroupBy(e => e).Select(x => new { key = x.Key, val = x.Count() }).ToList();
-
-//                    // Get the total of all pixels excluding unclassified (i.e., overlap boundary areas, or 0)
-//                    double totalPixels = uniqueCounts.Where(e => e.key != 0).Sum(e => e.val);
-
-//                    //Unclassified-> 0.
-//                    //Clear-> 1.
-//                    //Cloud-> 2.
-//                    //Cloud Shadow -> 3.
-//                    //Snow-> 4.
-//                    //Water-> 5.
-
-//                    // Calculate percentage of each fmask class
-
-
-
-//                    // Count percentage of valid pixels and keep if > minimum allowed
-//                    //double totalPixels = pixels2D.Length;
-//                    double validPixels = pixels1D.Where(e => validClasses.Contains(e)).ToArray().Length;
-
-//                    if ((validPixels / totalPixels) < minValid)
-//                    {
-//                        invalidDates.Add(date);
-//                    }
-
-//                    // TODO: Delete image for current item
-
-//                    // Notify
-//                    System.Diagnostics.Debug.WriteLine($"Ended validity check: {date}");
-//                });
-
-//                return invalidDates;
-//            }, BackgroundProgressor.None);
-
-//            // Remove any date from Result that are valid and sort ascending (inplace)
-//            Result.Features.RemoveAll(e => invalidDates.Contains(e.Properties.DateTime.ToString("yyyy-MM-dd")));  //yyyy-MM-ddThh:mm:ss
-//            Result.Features.Sort((a, b) => a.Properties.DateTime.CompareTo(b.Properties.DateTime));
-//        }
-    
-//        public void GetWcs(List<string> assetNames)
-//        {
-//            // TODO: check inputs
-//            // TODO: check Result items
-//            // TODO: move this code to helpers, reference that
-//            // TODO: implement group by solar day
-
-//            // Set up dictionary to hold raw and clean date
-//            Wcs = new Dictionary<string, string[]>();
-
-//            // Convert assetNames to comma-seperated string
-//            string assets = string.Join(",", assetNames);
-
-//            // Convert raw dates to WCS-friendly format
-//            var dates = Result.Features.Select(e => e.Properties.DateTime.ToString("yyyy-MM-dd"));  //yyyy-MM-ddThh:mm:ss
-//            dates = dates.Distinct().ToList();
-
-//            // Get Albers bounding box
-//            string bbox = string.Join(",", QueryBoundingBoxAlbers);
-
-//            foreach (string date in dates)
-//            {
-//                // Create WCS query url
-//                string url = "";
-//                url += "https://ows.dea.ga.gov.au/wcs?service=WCS";
-//                url += "&VERSION=1.0.0";
-//                url += "&REQUEST=GetCoverage";
-//                url += "&COVERAGE=ga_ls8c_ard_3";
-//                url += "&TIME=" + date;
-//                url += "&MEASUREMENTS=" + assets;
-//                url += "&BBOX=" + bbox;
-//                url += "&CRS=EPSG:3577";
-//                url += "&RESX=30.0";
-//                url += "&RESY=30.0";
-//                url += "&FORMAT=GeoTIFF";
-
-//                // Prepare filename
-//                string filename = date.Replace("-", "").Replace(":", "") + ".tif";
-
-//                // Create new item data structure (url, filename) and add
-//                string[] item = new string[] { url, filename };
-//                Wcs.Add(date, item); 
-//            }
-//        }
-//    }
-
-//    public class Root
-//    {
-//        [JsonPropertyName("type")]
-//        public string Type { get; set; }
-
-//        [JsonPropertyName("features")]
-//        public List<Feature> Features { get; set; }
-
-//        [JsonPropertyName("links")]
-//        public List<Link> Links { get; set; }
-
-//        [JsonPropertyName("numberReturned")]
-//        public int ReturnedCount { get; set; }
-
-//        [JsonPropertyName("context")]
-//        public Context Context { get; set; }
-
-//        [JsonPropertyName("numberMatched")]
-//        public int MatchedCount { get; set; }
-
-//        [JsonPropertyName("stac_version")]
-//        public string StacVersion { get; set; }
-    
-//    }
-
-//    public class Context
-//    {
-//        [JsonPropertyName("page")]
-//        public int Page { get; set; }
-
-//        [JsonPropertyName("returned")]
-//        public int Returned { get; set; }
-
-//        [JsonPropertyName("matched")]
-//        public int Matched { get; set; }
-
-//        [JsonPropertyName("limit")]
-//        public int Limit { get; set; }
-//    }
-
-//    public class Feature
-//    {
-//        [JsonPropertyName("id")]
-//        public string Id { get; set; }
-
-//        [JsonPropertyName("type")]
-//        public string Type { get; set; }
-
-//        [JsonPropertyName("properties")]
-//        public Properties Properties { get; set; }
-
-//        [JsonPropertyName("geometry")]
-//        public Geometry Geometry { get; set; }
-
-//        [JsonPropertyName("assets")]
-//        public Dictionary<string, Asset> Assets { get; set; }
-
-//        [JsonPropertyName("stac_version")]
-//        public string StacVersion { get; set; }
-//    }
-
-//    public class Asset
-//    {
-//        [JsonPropertyName("title")]
-//        public string Title { get; set; }
-
-//        [JsonPropertyName("href")]
-//        public string Href { get; set; }
-
-//        [JsonPropertyName("type")]
-//        public string Type { get; set; }
-
-//        [JsonPropertyName("proj:epsg")]
-//        public int Epsg { get; set; }
-
-//        [JsonPropertyName("proj:shape")]
-//        public int[] Shape { get; set; }
-
-//        [JsonPropertyName("proj:transform")]
-//        public float[] Transform { get; set; }
-
-//        [JsonPropertyName("roles")]
-//        public string[] Roles { get; set; }
-//    }
-
-//    public class Properties
-//    {
-//        [JsonPropertyName("title")]
-//        public string Title { get; set; }
-
-//        [JsonPropertyName("datetime")]
-//        public DateTime DateTime { get; set; }
-
-//        [JsonPropertyName("proj:epsg")]
-//        public int Epsg { get; set; }
-        
-//        [JsonPropertyName("proj:shape")]
-//        public int[] Shape { get; set; }
-        
-//        [JsonPropertyName("proj:transform")]
-//        public float[] Transform { get; set; }
-        
-//        [JsonPropertyName("platform")]
-//        public string Platform { get; set; }
-        
-//        [JsonPropertyName("odc:product")]
-//        public string Product { get; set; }
-        
-//        [JsonPropertyName("odc:producer")]
-//        public string Producer { get; set; }
-        
-//        [JsonPropertyName("odc:product_family")]
-//        public string ProductFamily { get; set; }
-        
-//        [JsonPropertyName("odc:dataset_version")]
-//        public string DatasetVersion { get; set; }
-        
-//        [JsonPropertyName("dea:dataset_maturity")]
-//        public string DatasetMaturity { get; set; }
-        
-//        [JsonPropertyName("instruments")]
-//        public string[] Instruments { get; set; }
-        
-//        [JsonPropertyName("eo:cloud_cover")]
-//        public float CloudCover { get; set; }
-        
-//        [JsonPropertyName("view:sun_azimuth")]
-//        public float SunAzimuth { get; set; }
-        
-//        [JsonPropertyName("view:sun_elevation")]
-//        public float SunElevation { get; set; }
-        
-//        [JsonPropertyName("odc:region_code")]
-//        public string RegionCode { get; set; }
-        
-//        [JsonPropertyName("odc:file_format")]
-//        public string FileFormat { get; set; }
-        
-//        [JsonPropertyName("landsat:landsat_scene_id")]
-//        public string LandsatSceneId { get; set; }
-
-//        [JsonPropertyName("landsat:wrs_row")]
-//        public int LandsatWrsRow { get; set; }
-
-//        [JsonPropertyName("landsat:wrs_path")]
-//        public int LandsatWrsPath { get; set; }
-
-//        [JsonPropertyName("landsat:collection_number")]
-//        public int LandsatCollectionNumber { get; set; }
-
-//        [JsonPropertyName("landsat:landsat_product_id")]
-//        public string LandsatProductId { get; set; }
-
-//        [JsonPropertyName("landsat:collection_category")]
-//        public string LandsatCollectionCategory { get; set; }
-//    }
-
-//    public class Geometry
-//    {
-//        [JsonPropertyName("coordinates")]
-//        public float[][][] Coordinates { get; set; }
-
-//        [JsonPropertyName("type")]
-//        public string Type { get; set; }
-//    }
-
-//    public class Link
-//    {
-//        [JsonPropertyName("href")]
-//        public string Href { get; set; }
-
-//        [JsonPropertyName("rel")]
-//        public string Relative { get; set; }
-
-//        [JsonPropertyName("title")]
-//        public string Title { get; set; }
-
-//        [JsonPropertyName("type")]
-//        public string Type { get; set; }
-
-//        [JsonPropertyName("method")]
-//        public string Method { get; set; }
-//    }
-//}
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading.Tasks;
+using System.Windows.Documents;
+using ActiproSoftware.Products;
+using ArcGIS.Core.Geometry;
+using ArcGIS.Desktop.Core.Geoprocessing;
+using Microsoft.VisualBasic;
+
+namespace ArcDEA.Classes
+{
+    #region STAC metadata classes
+    /// <summary>
+    /// Root of STAC object. Contains top-level metadata for STAC 
+    /// query result.
+    /// </summary>
+    public class Root
+    {
+        [JsonPropertyName("type")]
+        public string Type { get; set; }
+
+        [JsonPropertyName("features")]
+        public List<Feature> Features { get; set; }
+
+        [JsonPropertyName("links")]
+        public List<Link> Links { get; set; }
+
+        [JsonPropertyName("numberReturned")]
+        public int ReturnedCount { get; set; }
+
+        [JsonPropertyName("context")]
+        public Context Context { get; set; }
+
+        [JsonPropertyName("numberMatched")]
+        public int MatchedCount { get; set; }
+
+        [JsonPropertyName("stac_version")]
+        public string StacVersion { get; set; }
+    }
+
+    /// <summary>
+    /// STAC link object. Contains metadata on various page links
+    /// returned from STAC query.
+    /// </summary>
+    public class Link
+    {
+        [JsonPropertyName("href")]
+        public string Href { get; set; }
+
+        [JsonPropertyName("rel")]
+        public string Relative { get; set; }
+
+        [JsonPropertyName("title")]
+        public string Title { get; set; }
+
+        [JsonPropertyName("type")]
+        public string Type { get; set; }
+
+        [JsonPropertyName("method")]
+        public string Method { get; set; }
+    }
+
+    /// <summary>
+    /// Context of STAC object. Contains metadata for STAC query
+    /// result regarding number of pages returned vs matched.
+    /// </summary>
+    public class Context
+    {
+        [JsonPropertyName("page")]
+        public int Page { get; set; }
+
+        [JsonPropertyName("returned")]
+        public int Returned { get; set; }
+
+        [JsonPropertyName("matched")]
+        public int Matched { get; set; }
+
+        [JsonPropertyName("limit")]
+        public int Limit { get; set; }
+    }
+
+    /// <summary>
+    /// A STAC feature object. Contains metadata for a single STAC
+    /// feature (e.g., Landsat scene), which itself may contain one 
+    /// or more assets (e.g., bands).
+    /// </summary>
+    public class Feature
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; }
+
+        [JsonPropertyName("type")]
+        public string Type { get; set; }
+
+        [JsonPropertyName("properties")]
+        public Properties Properties { get; set; }
+
+        [JsonPropertyName("geometry")]
+        public Geometry Geometry { get; set; }
+
+        [JsonPropertyName("bbox")]
+        public double[] BoundingBox { get; set; }
+
+        [JsonPropertyName("assets")]
+        public Dictionary<string, Asset> Assets { get; set; }
+
+        [JsonPropertyName("stac_version")]
+        public string StacVersion { get; set; }
+    }
+
+    /// <summary>
+    /// A STAC featyre geometry object. Contains metadata for 
+    /// a feature's geometry (e.g., bounding box).
+    /// </summary>
+    public class Geometry
+    {
+        [JsonPropertyName("coordinates")]
+        public float[][][] Coordinates { get; set; }
+
+        [JsonPropertyName("type")]
+        public string Type { get; set; }
+    }
+
+    /// <summary>
+    /// A STAC asset object. Contains metadata for a single STAC
+    /// asset (e.g., Landsat band).
+    /// </summary>
+    public class Asset
+    {
+        [JsonPropertyName("title")]
+        public string Title { get; set; }
+
+        [JsonPropertyName("href")]
+        public string Href { get; set; }
+
+        [JsonPropertyName("type")]
+        public string Type { get; set; }
+
+        [JsonPropertyName("proj:epsg")]
+        public int Epsg { get; set; }
+
+        [JsonPropertyName("proj:shape")]
+        public int[] Shape { get; set; }
+
+        [JsonPropertyName("proj:transform")]
+        public float[] Transform { get; set; }
+
+        [JsonPropertyName("roles")]
+        public string[] Roles { get; set; }
+    }
+
+    /// <summary>
+    /// A STAC asset properties object. Contains metadata for 
+    /// various STAC asset properties (e.g., date, time, band name).
+    /// </summary>
+    public class Properties
+    {
+        [JsonPropertyName("title")]
+        public string Title { get; set; }
+
+        [JsonPropertyName("datetime")]
+        public DateTime DateTime { get; set; }
+
+        [JsonPropertyName("proj:epsg")]
+        public int Epsg { get; set; }
+
+        [JsonPropertyName("proj:shape")]
+        public int[] Shape { get; set; }
+
+        [JsonPropertyName("proj:transform")]
+        public float[] Transform { get; set; }
+
+        [JsonPropertyName("platform")]
+        public string Platform { get; set; }
+
+        [JsonPropertyName("odc:product")]
+        public string Product { get; set; }
+
+        [JsonPropertyName("odc:producer")]
+        public string Producer { get; set; }
+
+        [JsonPropertyName("odc:product_family")]
+        public string ProductFamily { get; set; }
+
+        [JsonPropertyName("odc:dataset_version")]
+        public string DatasetVersion { get; set; }
+
+        [JsonPropertyName("dea:dataset_maturity")]
+        public string DatasetMaturity { get; set; }
+
+        [JsonPropertyName("instruments")]
+        public string[] Instruments { get; set; }
+
+        [JsonPropertyName("eo:cloud_cover")]
+        public float CloudCover { get; set; }
+
+        [JsonPropertyName("view:sun_azimuth")]
+        public float SunAzimuth { get; set; }
+
+        [JsonPropertyName("view:sun_elevation")]
+        public float SunElevation { get; set; }
+
+        [JsonPropertyName("odc:region_code")]
+        public string RegionCode { get; set; }
+
+        [JsonPropertyName("odc:file_format")]
+        public string FileFormat { get; set; }
+
+        [JsonPropertyName("landsat:landsat_scene_id")]
+        public string LandsatSceneId { get; set; }
+
+        [JsonPropertyName("landsat:wrs_row")]
+        public int LandsatWrsRow { get; set; }
+
+        [JsonPropertyName("landsat:wrs_path")]
+        public int LandsatWrsPath { get; set; }
+
+        [JsonPropertyName("landsat:collection_number")]
+        public int LandsatCollectionNumber { get; set; }
+
+        [JsonPropertyName("landsat:landsat_product_id")]
+        public string LandsatProductId { get; set; }
+
+        [JsonPropertyName("landsat:collection_category")]
+        public string LandsatCollectionCategory { get; set; }
+    }
+    #endregion
+
+    #region Download class
+    /// <summary>
+    /// 
+    /// </summary>
+    public class Download
+    {
+        public string Id { get; set; }
+        public DateTime Date { get; set; }
+        public Dictionary<string, string> Urls { get; set; }
+        public bool IsValid { get; set; } = false;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="urls"></param>
+        public Download(string id, DateTime date, Dictionary<string, string> urls)
+        {
+            Id = id;
+            Date = date;
+            Urls = urls;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="validPixels"></param>
+        /// <param name="minValid"></param>
+        public async Task CheckValidityViaMaskAsync(List<int> validPixels, double minValid)
+        {
+            // Fmask classes:
+            //Unclassified -> 0.
+            //Clear        -> 1.
+            //Cloud        -> 2.
+            //Cloud Shadow -> 3.
+            //Snow         -> 4.
+            //Water        -> 5.
+
+            // Always set to invalid to begin
+            IsValid = false;
+
+            // Extract and check fmask WCS url
+            string url = Urls.GetValueOrDefault("Mask");
+            if (url == null)
+            {
+                return;
+            }
+
+            await Task.Run(() =>
+            {
+                try
+                {
+                    // Open (download) mask WCS url
+                    using (OSGeo.GDAL.Dataset ds = OSGeo.GDAL.Gdal.Open(url, OSGeo.GDAL.Access.GA_ReadOnly))
+                    {
+                        // Isolate raster fmask band
+                        OSGeo.GDAL.Band band = ds.GetRasterBand(1);
+
+                        // Get required raster band dimensions
+                        int width = band.XSize;
+                        int height = band.YSize;
+                        int size = width * height;
+
+                        // Read byte values into block array
+                        Byte[] block = new Byte[size];
+                        band.ReadRaster(0, 0, width, height, block, width, height, 0, 0);
+
+                        // Get distinct pixel values and counts, non-zero (overlap) pixel total and number valid
+                        var counts = block.GroupBy(e => e)
+                                          .Select(e => new { key = e.Key, val = e.Count() })
+                                          .ToList();
+
+                        // Convert to propertion of total
+                        var freqs = counts.Select(e => new { key = e.key, val = (double)e.val / (double)size * 100 })
+                                          .ToList();
+
+
+
+
+                        //
+                        long valid = block.Where(e => validPixels.Contains(e)).ToArray().Length;
+                        long total = counts.Where(e => e.key != 0).Sum(e => e.val);
+
+                        // Calculate percentage of valid pixels,  keep if >= minimum allowed
+                        if (((double)valid / (double)total) >= minValid)
+                        {
+                            IsValid = true;
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine("Error during mask download!");
+                }
+            });
+        }
+        public async Task DownloadAndProcessFullAsync(string outputFolder, List<int> validPixels, bool dropMaskBand)
+        {
+            // TODO: some pixel values come back as -999, is -999 no data or 0 for dea landsat/sentinel?
+            // on closer look, these -999 pixels are occurring under fmask class 5 (water)
+            // do we want to set any value < 0 to 0?
+
+            // Get month and day with padded zeros
+            string outputPaddedMonth = Date.Month.ToString().PadLeft(2, '0');
+            string outputPaddedDay = Date.Day.ToString().PadLeft(2, '0');
+
+            // Create full output filename and combine with output folder
+            string outputFilename = $"{Date.Year}-{outputPaddedMonth}-{outputPaddedDay}.tif";
+            string outputFile = Path.Combine(outputFolder, outputFilename);
+
+            // Extract and check fmask WCS url
+            string url = Urls.GetValueOrDefault("Full");
+            if (url == null)
+            {
+                return;
+            }
+
+            await Task.Run(() =>
+            {
+                try
+                {
+                    // Open (download) full WCS url
+                    using (OSGeo.GDAL.Dataset inDS = OSGeo.GDAL.Gdal.Open(url, OSGeo.GDAL.Access.GA_Update))
+                    {
+                        // Get required dataset dimensions (all bands will be uniform)
+                        int width = inDS.RasterXSize;
+                        int height = inDS.RasterYSize;
+                        int size = width * height;
+
+                        // Create a dict of band names and a "value tuple" of index, band, block data
+                        var bands = new Dictionary<string, (int Index, OSGeo.GDAL.Band Band, short[] Block)>();
+                        for (int i = 1; i <= inDS.RasterCount; i++)
+                        {
+                            OSGeo.GDAL.Band band = inDS.GetRasterBand(i);
+                            string bandName = band.GetDescription();
+
+                            short[] block = new short[size];
+                            band.ReadRaster(0, 0, width, height, block, width, height, 0, 0);
+
+                            bands.Add(bandName, (i, band, block));
+                        }
+
+                        // Iterate each band block and set pixels to 0 where mask value invalid
+                        for (int i = 0; i < bands["oa_fmask"].Block.Length; i++)
+                        {
+                            if (!validPixels.Contains(bands["oa_fmask"].Block[i]))
+                            {
+                                foreach (var band in bands)
+                                {
+                                    if (band.Key != "oa_fmask")
+                                    {
+                                        band.Value.Block[i] = (short)0;
+                                    }
+                                }
+                            }
+                        }
+
+                        // TODO: remove anything < 0
+
+                        // Iterate each band and block and write changes
+                        foreach (var band in bands)
+                        {
+                            if (band.Key != "oa_fmask")
+                            {
+                                band.Value.Band.WriteRaster(0, 0, width, height, band.Value.Block, width, height, 0, 0);
+                            }
+                        }
+
+                        // Save changed to dataset
+                        inDS.FlushCache();
+
+                        // Drop mask band, if requested...
+                        if (dropMaskBand == true)
+                        {
+                            // Get non-mask band indexes for translate options
+                            List<string> keepBands = new List<string>();
+                            foreach(var band in bands)
+                            {
+                                if (band.Key != "oa_fmask")
+                                {
+                                    keepBands.Add("-b");
+                                    keepBands.Add(band.Value.Index.ToString());
+                                }
+                            }
+
+                            // Setup translate options, perform translate to subset bands, export as GeoTiff
+                            OSGeo.GDAL.GDALTranslateOptions options = new OSGeo.GDAL.GDALTranslateOptions(keepBands.ToArray());
+                            OSGeo.GDAL.Gdal.wrapper_GDALTranslate(outputFile, inDS, options, null, null);
+
+
+                            //string outputNc = $"{Date.Year}-{Date.Month}-{Date.Day}.nc";
+                            //string outputNcFile = Path.Combine(outputFolder, outputNc);
+                            //var args = Geoprocessing.MakeValueArray(outputFile, outputNcFile);
+                            //var result = Geoprocessing.ExecuteToolAsync("RasterToNetCDF", args);
+
+
+                        }
+                        else
+                        {
+                            // Export as GeoTiff if no modifications needed
+                            OSGeo.GDAL.Driver driver = OSGeo.GDAL.Gdal.GetDriverByName("GTiff");
+                            OSGeo.GDAL.Dataset outDS = driver.CreateCopy(outputFile, inDS, 0, null, null, null);
+                        }
+
+                        // Notify
+                        Debug.WriteLine($"Ended download: {Id}");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine("Error during full download!");
+                }
+            });
+        }
+        public async Task DownloadAndProcessIndexAsync(string outputFolder, string index, List<int> validPixels, bool dropMaskBand)
+        {
+            // TODO: take user nodatavalue
+            float noDataValue = -999;
+
+            // Create full output filename and combine with output folder
+            string outputFilename = $"{Date.Year}-{Date.Month}-{Date.Day}.tif";
+            string outputFile = Path.Combine(outputFolder, outputFilename);
+
+            // Extract and check fmask WCS url
+            string url = Urls.GetValueOrDefault("Full");
+            if (url == null)
+            {
+                return;
+            }
+
+            await Task.Run(() =>
+            {
+                try
+                {
+                    // Open (download) full WCS url
+                    using (OSGeo.GDAL.Dataset inDS = OSGeo.GDAL.Gdal.Open(url, OSGeo.GDAL.Access.GA_Update))
+                    {
+                        // Get required dataset dimensions (all bands will be uniform)
+                        int width = inDS.RasterXSize;
+                        int height = inDS.RasterYSize;
+                        int size = width * height;
+
+                        // Create a dict of band names and a "value tuple" of index, band, block data
+                        var bands = new Dictionary<string, (int Index, OSGeo.GDAL.Band Band, short[] Block)>();
+                        for (int i = 1; i <= inDS.RasterCount; i++)
+                        {
+                            OSGeo.GDAL.Band band = inDS.GetRasterBand(i);
+                            string bandName = band.GetDescription();
+
+                            short[] block = new short[size];
+                            band.ReadRaster(0, 0, width, height, block, width, height, 0, 0);
+
+                            bands.Add(bandName, (i, band, block));
+                        }
+
+                        // TODO: use using
+
+                        // Copy dataset to new in-memory dataset so we can add index band
+                        OSGeo.GDAL.Driver memDriver = OSGeo.GDAL.Gdal.GetDriverByName("MEM");
+                        OSGeo.GDAL.Dataset tmpDS = memDriver.CreateCopy("", inDS, 0, null, null, null);
+
+                        // Add new empty index band to dataset
+                        tmpDS.AddBand(OSGeo.GDAL.DataType.GDT_Float32, null);
+
+                        // Get the new band for index values (will be last index)
+                        OSGeo.GDAL.Band indexBand = tmpDS.GetRasterBand(tmpDS.RasterCount);
+                        indexBand.SetDescription(index.ToLower());
+
+                        // Read index values into index block (there will be none)
+                        float[] indexBlock = new float[size];
+                        indexBand.ReadRaster(0, 0, width, height, indexBlock, width, height, 0, 0);
+
+                        // Process block depending on user selection
+                        // https://github.com/GeoscienceAustralia/dea-notebooks/blob/develop/Tools/dea_tools/bandindices.py
+                        if (index == "EVI")
+                        {
+                            indexBlock = Helpers.EVI(indexBlock, bands["nbart_blue"].Block, bands["nbart_red"].Block, bands["nbart_nir"].Block, bands["oa_fmask"].Block, validPixels, noDataValue);
+                        }
+                        else if (index == "LAI")
+                        {
+                            indexBlock = Helpers.LAI(indexBlock, bands["nbart_blue"].Block, bands["nbart_red"].Block, bands["nbart_nir"].Block, bands["oa_fmask"].Block, validPixels, noDataValue);
+                        }
+                        else if (index == "MSAVI")
+                        {
+                            indexBlock = Helpers.MSAVI(indexBlock, bands["nbart_red"].Block, bands["nbart_nir"].Block, bands["oa_fmask"].Block, validPixels, noDataValue);
+                        }
+                        else if (index == "NDVI")
+                        {
+                            indexBlock = Helpers.NDVI(indexBlock, bands["nbart_red"].Block, bands["nbart_nir"].Block, bands["oa_fmask"].Block, validPixels, noDataValue);
+                        }
+                        else if (index == "kNDVI")
+                        {
+                            indexBlock = Helpers.kNDVI(indexBlock, bands["nbart_red"].Block, bands["nbart_nir"].Block, bands["oa_fmask"].Block, validPixels, noDataValue);
+                        }
+
+                        // Write changes to index band
+                        indexBand.WriteRaster(0, 0, width, height, indexBlock, width, height, 0, 0);
+
+                        // Set nodata
+                        indexBand.SetNoDataValue(float.Epsilon);
+
+                        // Save changed to temporary dataset
+                        tmpDS.FlushCache();
+
+                        // Prepare output band parameters for translate, add mask to end if requested
+                        List<string> keepBands = new List<string>() { "-b", tmpDS.RasterCount.ToString()};
+                        if (dropMaskBand == false)
+                        {
+                            int maskBandIndex = Helpers.GetMaskBandIndex(tmpDS);
+                            keepBands.Add("-b");
+                            keepBands.Add(maskBandIndex.ToString());
+                        }
+
+                        // Setup translate options, perform translate to subset bands, export as GeoTiff
+                        OSGeo.GDAL.GDALTranslateOptions options = new OSGeo.GDAL.GDALTranslateOptions(keepBands.ToArray());
+                        OSGeo.GDAL.Gdal.wrapper_GDALTranslate(outputFile, tmpDS, options, null, null);
+
+                        // Notify
+                        Debug.WriteLine($"Ended download: {Id}");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine("Error during full download!");
+                }
+            });
+        }
+    }
+    #endregion
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public class Stac
+    {
+        public string Endpoint { get; set; } = "https://explorer.sandbox.dea.ga.gov.au/stac/search?";
+        public string[] Collections { get; set; }
+        public string[] Assets { get; set; }
+        public string StartDate { get; set; }
+        public string EndDate { get; set; }
+        public double[] BoundingBox { get; set; }
+        public int Epsg { get; set; }
+        public int Resolution { get; set; }
+        public int Limit { get; set; } = 250;
+        public List<Feature> Features { get; set; }
+
+        public Stac(string[] collections, string[] assets, string startDate, string endDate, double[] boundingBox, int epsg, int resolution)
+        {
+            Collections = collections;
+            Assets = assets;
+            StartDate = startDate;
+            EndDate = endDate;
+            BoundingBox = boundingBox;
+            Epsg = epsg;
+            Resolution = resolution;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="client"></param>
+        /// <returns></returns>
+        public async Task GetFeaturesAsync(HttpClient client)
+        {
+            // Initialise a list of features
+            Features = new List<Feature>();
+
+            // Iterate each collection, fetch features, append to features list
+            foreach (string collection in Collections)
+            {
+                // Construct STAC URL
+                string url = Endpoint;
+                url += $"collection={collection}";
+                url += $"&time={StartDate}/{EndDate}";
+                url += $"&bbox=[{string.Join(",", BoundingBox)}]";
+                url += $"&limit={Limit}";
+
+                try
+                {
+                    bool more = true;
+                    while (more)
+                    {
+                        // Get content from STAC endpoint, deserialise and add to list
+                        string content = await client.GetStringAsync(url);
+                        Root root = JsonSerializer.Deserialize<Root>(content);
+
+                        // Add returned features to feature list
+                        Features.AddRange(root.Features);
+
+                        // Check if a "next" link exists, iterate and append, else leave
+                        var next = root.Links.Where(e => e.Relative == "next").FirstOrDefault();
+                        if (next != null)
+                        {
+                            url = next.Href;
+                        }
+                        else
+                        {
+                            more = false;
+                        }
+                    }
+                }
+                catch (HttpRequestException e)
+                {
+                    Console.WriteLine("Message :{0} ", e.Message);
+                    Features = null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="queryBoundingBox"></param>
+        /// <param name="userOverlapPercentage"></param>
+        /// <param name="queryEpsg"></param>
+        public void RemoveOvershootFeatures(double[] queryBoundingBox, double userOverlapPercentage, int queryEpsg)
+        {
+            if (Features != null && Features.Count > 0)
+            {
+                // Init spatial reference in query epsg
+                SpatialReference sridWGS84 = SpatialReferenceBuilder.CreateSpatialReference(queryEpsg);
+
+                // create user query envelope (do once)
+                MapPoint queryPointSW = MapPointBuilderEx.CreateMapPoint(queryBoundingBox[0], queryBoundingBox[1], sridWGS84);
+                MapPoint queryPointNE = MapPointBuilderEx.CreateMapPoint(queryBoundingBox[2], queryBoundingBox[3], sridWGS84);
+                Envelope queryEnvelope = EnvelopeBuilderEx.CreateEnvelope(queryPointSW, queryPointNE);
+                Polygon queryPolygon = PolygonBuilderEx.CreatePolygon(queryEnvelope);
+
+                double queryPolygonArea = GeometryEngine.Instance.Area(queryPolygon);
+
+
+                // Iterate features and exclude slcoff features
+                List<Feature> result = new List<Feature>();
+                foreach (var feat in Features)
+                {
+                    var featGeometryCoords = feat.Geometry.Coordinates[0];
+
+                    List<MapPoint> vertices = new List<MapPoint>();
+                    foreach(var coord in featGeometryCoords)
+                    {
+                        MapPoint vertex = MapPointBuilderEx.CreateMapPoint(coord[0], coord[1]);
+                        vertices.Add(vertex);
+                    }
+
+                    Polygon featurePolygon = PolygonBuilderEx.CreatePolygon(vertices, sridWGS84);
+
+                    // todo: clean this up
+
+                    if (GeometryEngine.Instance.Intersects(queryPolygon, featurePolygon))
+                    {
+                        var intersection = GeometryEngine.Instance.Intersection(queryPolygon, featurePolygon);
+
+                        double intersectionPolygonArea = GeometryEngine.Instance.Area(intersection);
+                        double percentFeatureEnvelope = intersectionPolygonArea / queryPolygonArea * 100;
+
+                        if (percentFeatureEnvelope < userOverlapPercentage)
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            result.Add(feat);
+                        }
+                    };
+                }
+
+                // Override existing features
+                Features = result;
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public void RemoveSlcOffFeatures()
+        {
+            if (Features != null && Features.Count > 0)
+            {
+                // Set SLC-off start date (2003 May 31)
+                DateTime startDateSlcOff = new DateTime(2003, 5, 31);
+
+                // Iterate features and exclude slcoff features
+                List<Feature> result = new List<Feature>();
+                foreach (var feat in Features)
+                {
+                    // Get current platform name and date and add to result if valid
+                    string featPlatform = feat.Properties.Platform;
+                    DateTime featDateTime = feat.Properties.DateTime;
+                    if (featPlatform == "landsat-7" && featDateTime.Date >= startDateSlcOff.Date)
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        result.Add(feat);
+                    }
+                }
+
+                // Override existing features
+                Features = result;
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public void GroupBySolarDay()
+        {
+            // Sort by datetime in ascending order
+            if (Features != null && Features.Count > 1)
+            {
+                Features = Features.OrderBy(e => e.Properties.DateTime).ToList();
+            }
+
+            // Group by date (without time), select first date in each group, overwrite
+            List<Feature> groups = Features.GroupBy(e => e.Properties.DateTime.ToString("yyyy-MM-dd")).Select(e => e.First()).ToList();
+            Features = groups;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public void SortFeaturesByDate()
+        {
+            if (Features != null && Features.Count > 1)
+            {
+                Features = Features.OrderBy(e => e.Properties.DateTime).ToList();
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public List<Download> ConvertFeaturesToDownloads()
+        {
+            // Create a list of Download
+            List<Download> downloads = new List<Download>();
+
+            if (Features != null && Features.Count > 0)
+            {
+                // Convert raw query parameters to string formats
+                string assets = string.Join(",", Assets);
+
+                // Project input bbox to output bbox coordinates and set as string
+                double[] outBoundingBox = Helpers.ReprojectBoundingBox(BoundingBox, 4326, Epsg);
+                string bbox = string.Join(",", outBoundingBox);
+
+                // Convert epsg and resolution to strings
+                string epsg = $"EPSG:{Epsg}";
+                string resolution = Resolution.ToString();
+
+                foreach (var feature in Features)
+                {
+                    if (feature.Properties.Title != null)
+                    {
+                        // Get collection from dataset title (only way between products)
+                        var collection = feature.Properties.Title.Split("-")[0];
+
+                        // Extract date into format
+                        string date = feature.Properties.DateTime.ToString("yyyy-MM-dd");
+
+                        // Create WCS query url (without assets)
+                        string url = "";
+                        url += "https://ows.dea.ga.gov.au/wcs?service=WCS";
+                        url += "&VERSION=1.0.0";
+                        url += "&REQUEST=GetCoverage";
+                        url += "&COVERAGE=" + collection;
+                        url += "&TIME=" + date;
+                        url += "&MEASUREMENTS={*}";
+                        url += "&BBOX=" + bbox;
+                        url += "&CRS=" + epsg;
+                        url += "&RESX=" + resolution;
+                        url += "&RESY=" + resolution;
+                        url += "&FORMAT=GeoTIFF";
+
+                        // Create a WCS url for mask and user assets, seperately
+                        Dictionary<string, string> urls = new Dictionary<string, string>()
+                        {
+                            {"Mask", url.Replace("{*}", "oa_fmask") },
+                            {"Full", url.Replace("{*}", assets) },
+                        };
+
+                        // Create new download item and add to downloads
+                        Download download = new Download(feature.Id, feature.Properties.DateTime, urls);
+                        downloads.Add(download);
+                    }
+                }
+            }
+
+            return downloads;
+        }
+    }
+}

@@ -21,8 +21,7 @@
                LastChildFill="true" 
                KeyboardNavigation.TabNavigation="Local">
 
-        <Grid Name="GrdMainControls"
-              IsEnabled="{Binding IsNotProcessing}">
+        <Grid Name="GrdMainControls">
             
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -30,15 +29,16 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
-
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" MinHeight="54" MaxHeight="400" />
             </Grid.RowDefinitions>
 
             <StackPanel Name="QueryAreaControls"
                         Grid.Row="0"
-                        Margin="0,0,0,6">
+                        Margin="0,0,0,6"
+                        IsEnabled="{Binding IsNotProcessing}">
 
                 <TextBlock Name="TxbQueryAreaHeading"
 						   Text="Query Area"
@@ -55,12 +55,12 @@
 							  Margin="0,0,5,0"
 							  ItemsSource="{Binding QueryAreaLayers}" 
 							  SelectedItem="{Binding SelectedQueryAreaLayer, Mode=TwoWay}" />
-                    
+
                     <Button Name="BtnCreateQueryArea"
                             Grid.Column="1"
 						    Width="21.96"
 						    Command="{Binding CmdDrawQueryArea}"
-						    BorderBrush="Transparent"
+                            BorderBrush="Transparent"
 						    ToolTip="Draw a new query area.">
 
                         <Image Name="ImageCreateQueryArea"
@@ -74,7 +74,8 @@
             <StackPanel Name="DatasetControls"
                         Grid.Row="1"
                         Margin="0,0,0,6"
-                        Visibility="{Binding ShowDatasetsControls}">
+                        Visibility="{Binding ShowDatasetsControls}"
+                        IsEnabled="{Binding IsNotProcessing}">
 
                 <TextBlock Name="TxbDatasetHeading"
 						   Text="Dataset"
@@ -141,7 +142,8 @@
             <StackPanel Name="DatesControls"
                         Grid.Row="2"
                         Margin="0,0,0,12"
-					    Visibility="{Binding ShowDatesControls}">
+					    Visibility="{Binding ShowDatesControls}"
+                        IsEnabled="{Binding IsNotProcessing}">
 
                 <TextBlock Name="TxbDatesHeading" 
 						   Text="Date Range"
@@ -193,7 +195,9 @@
 					  IsExpanded="True"
 					  Visibility="{Binding ShowCollectionsAndAssetsControls}">
 
-                <StackPanel>
+                <StackPanel Name="StkCollectionsAndAssets"
+                            IsEnabled="{Binding IsNotProcessing}">
+                    
                     <StackPanel Name="CollectionControls" 
 							    Margin="18,0,0,6">
 
@@ -259,11 +263,13 @@
 
                         <CheckBox Name="CbxIncludeSlcOff"
 								  Margin="0,4,0,0"
+                                  HorizontalAlignment="Left"
 								  Content="Include SLC-off data"
 								  Focusable="False"
 								  IsHitTestVisible="True"
 								  IsChecked="{Binding QueryIncludeSlcOff}"
-								  Visibility="{Binding ShowSlcOffControl}" />
+								  Visibility="{Binding ShowSlcOffControl}" 
+                                  Style="{DynamicResource Esri_CheckboxToggleSwitch}"/>
                     </StackPanel>
 
                     <StackPanel Name="AssetControls"
@@ -275,7 +281,7 @@
 
                         <TabControl Name="TabAssets"
 								    MinHeight="60"
-								    MaxHeight="240"
+								    MaxHeight="260"
 								    SelectedIndex="{Binding SelectedAssetTabIndex}">
 
                             <TabItem Header="Bands">
@@ -393,12 +399,14 @@
 
             <Expander Name="ExpQualityOptions"
                       Grid.Row="4"
-					  Header="Quality Options"
-					  Margin="-4,0,0,104" 
+					  Header="Quality"
+					  Margin="-4,0,0,12" 
 					  IsExpanded="False"
 					  Visibility="{Binding ShowQualityOptionsControls}">
 
-                <StackPanel>
+                <StackPanel Name="StkQualityOptions"
+                            IsEnabled="{Binding IsNotProcessing}">
+                    
                     <StackPanel Name="MaskValuesControls" 
 							    Margin="18,0,0,6">
 
@@ -490,16 +498,48 @@
                 </StackPanel>
             </Expander>
 
+            <Expander Name="ExpResampling"
+                      Grid.Row="5"
+					  Header="Resampling"
+					  Margin="-4,0,0,104" 
+					  IsExpanded="False"
+					  Visibility="{Binding ShowResamplingControls}">
+
+                <StackPanel Name="StkResampling"
+                            IsEnabled="{Binding IsNotProcessing}">
+
+                    <StackPanel Name="ResolutionControls" 
+							    Margin="18,0,0,6">
+
+                        <TextBlock Name="TxbResolutionHeading" 
+								   Text="Resolution"
+								   Style="{DynamicResource Esri_TextBlockRegular}" />
+
+                        <TextBox Name="TxbResolution"
+                                 Text="{Binding QueryResolution}"
+                                 PreviewTextInput="NumberValidationTextBox" />
+
+
+
+
+                    </StackPanel>
+                </StackPanel>
+
+            </Expander>
+
             <StackPanel Name="OutputsControls"
-                        Grid.Row="5"
+                        Grid.Row="6"
                         Margin="0,-104,0,0"
                         VerticalAlignment="Bottom">
 
                 <TextBlock Name="TxbOutputFolderHeading"
 					       Text="Output Folder"
-					       Style="{DynamicResource Esri_TextBlockRegular}" />
+					       Style="{DynamicResource Esri_TextBlockRegular}" 
+                           IsEnabled="{Binding IsNotProcessing}"/>
 
-                <Grid>
+                <Grid Name="GrdOutputControls"
+                      IsEnabled="{Binding IsNotProcessing}">
+                    
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
@@ -535,23 +575,21 @@
 					    Content="Run"
 					    Command="{Binding CmdRun}" 
 					    Style="{DynamicResource Esri_Button}" />
+                
+                <!-- cancel button todo go here-->
+                
             </StackPanel>
 
-            <GridSplitter Grid.Row="6" 
+            <GridSplitter Grid.Row="7" 
                           Height="4" 
                           Margin="-6,0,-6,0"
                           HorizontalAlignment="Stretch" 
                           VerticalAlignment="Bottom" 
-                          ResizeBehavior="PreviousAndNext" Visibility="Visible"/>
+                          ResizeBehavior="PreviousAndNext" 
+                          Visibility="{Binding ProcessingPanelVisbility}" />
 
-            
-            
-            
-            <Grid Grid.Row="7" 
-                  Background="White"
-                  Visibility="{Binding IsNotProcessing}">
-
-
+            <Grid Grid.Row="8" 
+                  Background="White">
 
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -566,7 +604,8 @@
                     <Button Name="BtnShowProcessingMessages" 
                             Width="14"
                             Height="14"
-                            Margin="0,0,0,0"/>
+                            Margin="0,0,0,0"
+                            Command="{Binding CmdHideProcessing}" />
 
                     <TextBlock Text="Show" 
                                Margin="4,0,0,0" 
@@ -585,7 +624,8 @@
 						           HorizontalAlignment="Left"
 						           VerticalAlignment="Center"
 						           Text="{Binding ProgressMessage}" 
-						           Style="{DynamicResource Esri_TextBlockRegular}" />
+						           Style="{DynamicResource Esri_TextBlockRegular}" 
+/>
 
                         <TextBlock Name="TxtProgressPercentage"  
 						           Grid.Column="1"
@@ -607,12 +647,18 @@
 							     Foreground="#007AC2" 
 							     Background="#CBCBCB" 
 							     BorderThickness="0"/>
-
-                    <TextBlock Grid.Row="2" 
-                               Margin="0,12,0,0" 
-                               Text="Hello &#x0a;Goodbye &#x0a;No I say &#x0a;Goodbye!" />
-
                 </StackPanel>
+
+                <TextBox Name="TxtProcessingMessages"
+                         
+                         Grid.Row="2" 
+                         Margin="-4,12,0,0" 
+                         Text="{Binding ProcessingMessages}"  
+                         TextWrapping="Wrap"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.CanContentScroll="True" 
+                         BorderThickness="0"
+                         Visibility="{Binding ProcessingPanelVisbility}" />
 
             </Grid>
 

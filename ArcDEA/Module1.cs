@@ -31,6 +31,7 @@ namespace ArcDEA
             Helpers.CustomGdalConfigure();
 
             //// TODO: this is likely easier to do some other way, but we need proj.db for osr to work either way...
+            ///// todo: clean this up
             var installFolder = System.Reflection.Assembly.GetEntryAssembly().Location.ToString();
             installFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(installFolder, @"..\..\"));
             OSGeo.OSR.Osr.SetPROJSearchPath(System.IO.Path.Combine(installFolder, @"Resources\pedata\gdaldata"));

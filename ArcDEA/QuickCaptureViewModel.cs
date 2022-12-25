@@ -15,8 +15,6 @@ using ArcGIS.Desktop.Mapping.Events;
 using ArcDEA.Classes;
 using System.Net.Http;
 using System.IO;
-using ArcGIS.Desktop.Framework.Controls;
-using System.Reflection;
 using System.Diagnostics;
 
 namespace ArcDEA
@@ -230,18 +228,23 @@ namespace ArcDEA
                 if (_selectedQueryDataset != null)
                 {
                     QueryCollections = Helpers.PopulateCollectionItems(_selectedQueryDataset.Name);
+                    QueryRawAssets = Helpers.PopulateRawAssetItems(_selectedQueryDataset.Name);
+
                     ShowDatesControls = "Visible"; 
                     ShowCollectionsAndAssetsControls = "Visible";  // TODO: put in if statement check ls or s2, if so, show dates and assets, else just assets
 
                     if (SelectedQueryDataset.Name == "Landsat")
                     {
                         ShowSlcOffControl = "Visible";
+                        QueryResolution = "30";
                     }
-                    else
+                    else if (SelectedQueryDataset.Name == "Sentinel")
                     {
                         ShowSlcOffControl = "Collapsed";
+                        QueryResolution = "10";
                     }
 
+                    ShowResamplingControls = "Visible";
                     ShowQualityOptionsControls = "Visible";
                 };
             }
@@ -287,11 +290,10 @@ namespace ArcDEA
             set { SetProperty(ref _showCollectionsAndAssetsControls, value, () => ShowCollectionsAndAssetsControls); }
         }
 
-
         /// <summary>
         /// List of available DEA data collections.
         /// </summary>
-        private List<Helpers.CollectionItem> _queryCollections = null; //Helpers.PopulateCollectionItems();
+        private List<Helpers.CollectionItem> _queryCollections = null;
         public List<Helpers.CollectionItem> QueryCollections
         {
             get { return _queryCollections; }
@@ -334,7 +336,7 @@ namespace ArcDEA
         /// <summary>
         /// List of available raw assets (i.e., bands) for current DEA data collection.
         /// </summary>
-        private List<Helpers.AssetRawItem> _queryRawAssets = Helpers.PopulateRawAssetItems();
+        private List<Helpers.AssetRawItem> _queryRawAssets = null;
         public List<Helpers.AssetRawItem> QueryRawAssets
         {
             get { return _queryRawAssets; }
@@ -418,6 +420,28 @@ namespace ArcDEA
             set { SetProperty(ref _queryCloudCover, value, () => QueryCloudCover); }
         }
         #endregion
+
+        #region QueryResampling controls
+        /// <summary>
+        /// Set resampling options.
+        /// </summary>
+        private string _showResamplingControls = "Hidden";
+        public string ShowResamplingControls
+        {
+            get { return _showResamplingControls; }
+            set { SetProperty(ref _showResamplingControls, value, () => ShowResamplingControls); }
+        }
+
+        //
+        private string _queryResolution = "30";
+        public string QueryResolution
+        {
+            get { return _queryResolution; }
+            set { SetProperty(ref _queryResolution, value, () => QueryResolution); }
+        }
+        #endregion
+
+
 
         #region Output folder controls
         /// <summary>
@@ -532,6 +556,18 @@ namespace ArcDEA
         /// <summary>
         /// Sets whether the process is running or not.
         /// </summary>
+
+        /// <summary>
+        /// Processing messages for display in textbox.
+        /// </summary>
+        private string _processingMessages;
+        public string ProcessingMessages
+        {
+            get { return _processingMessages; }
+            set { SetProperty(ref _processingMessages, value, () => ProcessingMessages); }
+        }
+
+
         private bool _isNotPocessing = true;
         public bool IsNotProcessing
         {
@@ -539,6 +575,44 @@ namespace ArcDEA
             set { SetProperty(ref _isNotPocessing, value, () => IsNotProcessing); }
         }
         #endregion
+
+
+        private string _processingPanelVisbility = "Hidden";
+        public string ProcessingPanelVisbility
+        {
+            get { return _processingPanelVisbility; }
+            set { SetProperty(ref _processingPanelVisbility, value, () => ProcessingPanelVisbility); }
+        }
+
+        private string _processingPanelHeight = "*";
+        public string ProcessingPanelHeight
+        {
+            get { return _processingPanelHeight; }
+            set { SetProperty(ref _processingPanelHeight, value, () => ProcessingPanelHeight); }
+        }
+
+
+
+        public ICommand CmdHideProcessing
+        {
+            get
+            {
+                return new RelayCommand(async () =>
+                {
+                    if (ProcessingPanelVisbility == "Hidden")
+                    {
+                        ProcessingPanelVisbility = "Visible";
+                        //ProcessingPanelHeight = "Auto";
+                        ProcessingPanelHeight = "144";
+                    }
+                    else
+                    {
+                        ProcessingPanelVisbility = "Hidden";
+                        ProcessingPanelHeight = "54";
+                    }
+                });
+            }
+        }
 
 
         /// <summary>
@@ -551,14 +625,21 @@ namespace ArcDEA
                 return new RelayCommand(async () =>
                 {
                     #region General initialisation
+                    // Start stop watch
+                    var timer = Stopwatch.StartNew();
+
                     // Flag that process is now running
                     IsNotProcessing = false;
+
+                    // Set starting time message
+                    ProcessingMessages = $"Start Time: {DateTime.Now.ToString("dddd, dd MMMM yyyy")}" + Environment.NewLine;
 
                     // Set progressor
                     RefreshProgressBar(0, 100, "Initialising...", true);
                     ProgressPercentage = "";
                     IProgress<int> progressValue = new Progress<int>(e => ProgressValue = e);
                     IProgress<string> progressPercent = new Progress<string>(e => ProgressPercentage = e);
+                    ProcessingMessages += Environment.NewLine + "Initializing..." + Environment.NewLine;
 
                     // Get the ArcGIS temporary folder path
                     string tmpFolder = Path.GetTempPath();
@@ -569,9 +650,10 @@ namespace ArcDEA
 
                     var numCores = new ParallelOptions { MaxDegreeOfParallelism = availableCores };
                     System.Diagnostics.Debug.WriteLine($"Using {availableCores} cores.");
+                    ProcessingMessages += $"Using {availableCores} cores." + Environment.NewLine;
 
                     // TESTING
-                    //numCores.MaxDegreeOfParallelism = 1;
+                    numCores.MaxDegreeOfParallelism = 1;
 
                     // Open a HTTP client with 30 minute timeout
                     var client = new HttpClient();
@@ -636,9 +718,8 @@ namespace ArcDEA
                     // TODO: add this to UI
                     int epsg = 3577;
 
-                    // Setup resolution value
-                    // TODO: add this to UI
-                    double resolution = 30.0;
+                    // Setup resolution value todo error handling
+                    int resolution = Convert.ToInt32(QueryResolution);
 
                     // Setup nodata value
                     // TODO: add this to UI
@@ -662,9 +743,10 @@ namespace ArcDEA
                     #region Construct STAC results and download structure
                     // Set progressor
                     RefreshProgressBar(1, 100, "Querying STAC endpoint...", true);
+                    ProcessingMessages += Environment.NewLine + "Querying STAC endpoint..." + Environment.NewLine;
 
                     // Initialise stac endpoint with relevant query details and populate via download
-                    Stac2 stac = new Stac2(collections, assets.ToArray(), startDate, endDate, inBoundingBox, epsg, resolution);
+                    Stac stac = new Stac(collections, assets.ToArray(), startDate, endDate, inBoundingBox, epsg, resolution);
                     await QueuedTask.Run(async () => {
                         await stac.GetFeaturesAsync(client);
                     });
@@ -672,10 +754,21 @@ namespace ArcDEA
                     // Check we got something
                     if (stac.Features.Count == 0)
                     {
+                        ProcessingMessages += $"No images found." + Environment.NewLine;
                         return;
                     }
+                    else
+                    {
+                        ProcessingMessages += $"Found {stac.Features.Count} images." + Environment.NewLine;
+                    }
+
+                    // Remove any scenes where too many pixels outside bounding bix (4326)
+                    double userOverlapPercentage = 15.0;  // todo: move this to ui
+                    stac.RemoveOvershootFeatures(inBoundingBox, userOverlapPercentage, 4326);  // todo clean this up inside
+
 
                     // Remove Landsat 7 data where SLC-off if requested
+                    // todo: if sentinel 2, ignore
                     if (QueryIncludeSlcOff == false)
                     {
                         stac.RemoveSlcOffFeatures();
@@ -692,12 +785,16 @@ namespace ArcDEA
                     #region Download and assess fmask data
                     // Set progressor
                     RefreshProgressBar(1, downloads.Count, "Downloading and assessing fmask data...", false);
+                    ProcessingMessages += Environment.NewLine + "Downloading and assessing fmask data..." + Environment.NewLine;
 
                     int i = 0;
                     await QueuedTask.Run(() => Parallel.ForEachAsync(downloads, numCores, async (download, token) =>
                     {
                         // Download mask geotiff, get num valid pixels, flag item as valid (or not)
                         await download.CheckValidityViaMaskAsync(validPixels, minValid);
+
+                        // Update message
+                        ProcessingMessages += $"> Downloaded ID: {download.Id}" + Environment.NewLine;
 
                         // Increment progress 
                         i = i + 1;
@@ -710,12 +807,24 @@ namespace ArcDEA
 
                     // Subset downloads to only those flagged as valid
                     downloads = downloads.Where(e => e.IsValid == true).ToList();
+
+                    // Check we got something
+                    if (downloads.Count == 0)
+                    {
+                        ProcessingMessages += "No valid images remain after fmask assessment." + Environment.NewLine;
+                        return;
+                    }
+                    else
+                    {
+                        ProcessingMessages += Environment.NewLine + $"Assessment of fmask found {downloads.Count} valid images." + Environment.NewLine;
+                    }
                     #endregion
 
                     #region Download valid data, set invalid pixels to NoData, save to folder
                     // Set progressor
-                    RefreshProgressBar(1, downloads.Count, "Downloading and processing satellite data...", false);
+                    RefreshProgressBar(1, downloads.Count, "Downloading and processing valid satellite data...", false);
                     ProgressPercentage = "";
+                    ProcessingMessages += Environment.NewLine + "Downloading and processing valid satellite data..." + Environment.NewLine;
 
                     i = 0;
                     await QueuedTask.Run(() => Parallel.ForEachAsync(downloads, numCores, async (download, token) =>
@@ -736,6 +845,9 @@ namespace ArcDEA
                             // TODO: calculator
                         }
 
+                        // Update message
+                        ProcessingMessages += $"> Downloaded ID: {download.Id}" + Environment.NewLine;
+
                         // Increment progress
                         i = i + 1;
                         progressValue.Report(i);
@@ -746,9 +858,19 @@ namespace ArcDEA
                     // Final message
                     RefreshProgressBar(1, 1, "Finished.", false);
                     ProgressPercentage = "";
+                    ProcessingMessages += Environment.NewLine + "Finished." + Environment.NewLine;
+
+                    // Set success date time message
+                    ProcessingMessages += Environment.NewLine + $"Succeeded at {DateTime.Now.ToString("dddd, dd MMMM yyyy")}" + " " + Environment.NewLine;
+
+                    // Set success duration
+                    timer.Stop();
+                    var duration = Math.Round(timer.Elapsed.TotalMilliseconds, 2);
+                    ProcessingMessages += $"(Elapsed Time: {duration} seconds).";
 
                     // Turn processing flag off
                     IsNotProcessing = true;
+
                 });
             }
         }

@@ -1043,3 +1043,119 @@ result = await Geoprocessing.ExecuteToolAsync("management.AddRastersToMosaicData
 
 
 // add field to footprint via mosaic
+
+
+
+using GDALTestEnvironment;
+using OSGeo.GDAL;
+using OSGeo.OGR;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Net;
+using System.Text.Json;
+using static System.Net.Mime.MediaTypeNames;
+using static System.Net.WebRequestMethods;
+
+Console.WriteLine("Starting app!");
+
+GdalConfiguration.ConfigureGdal();
+GdalConfiguration.ConfigureOgr();
+
+
+// Set optimal GDAL configurations
+OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_UNSAFESSL", "YES");
+OSGeo.GDAL.Gdal.SetConfigOption("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", "tif");
+OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_MULTIRANGE", "YES");
+OSGeo.GDAL.Gdal.SetConfigOption("GDAL_HTTP_MERGE_CONSECUTIVE_RANGES", "YES");
+
+// Create WCS query url (without assets)
+//string url = "";
+//url += "https://ows.dea.ga.gov.au/wcs?service=WCS";
+//url += "&VERSION=1.0.0";
+//url += "&REQUEST=GetCoverage";
+//url += "&COVERAGE=" + collection;
+//url += "&TIME=" + date;
+//url += "&MEASUREMENTS={*}";
+//url += "&BBOX=" + bbox;
+//url += "&CRS=" + epsg;
+//url += "&RESX=" + resolution;
+//url += "&RESY=" + resolution;
+
+var client = new HttpClient();
+
+string url = "";
+url += "https://ows.dea.ga.gov.au/wms?service=WMS";
+url += "&VERSION=1.3.0";
+url += "&REQUEST=GetMap";
+url += "&LAYERS=" + "ga_ls8c_ard_3";
+url += "&TIME=" + "2015-01-04";
+//url += "&MEASUREMENTS={*}";
+url += "&BBOX=" + "-31.960002,115.823463,-31.947264,115.856662";
+url += "&CRS=" + "EPSG:4326";
+//url += "&RESX=" + 30;
+//url += "&RESY=" + 30;
+url += "&WIDTH=" + "500";
+url += "&HEIGHT=" + "450";
+url += "&FORMAT=image/png";
+url += "&STYLES=";
+url += "&DPI=72";
+
+
+
+//string url = "https://ows.dea.ga.gov.au/wms?service=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ga_ls8c_ard_3&crs=EPSG:4326&format=image/png&type=wmst&allowTemporalUpdates=true&enableTime=true";
+
+//using (OSGeo.GDAL.Dataset inDS = OSGeo.GDAL.Gdal.Open(url, OSGeo.GDAL.Access.GA_ReadOnly))
+//{
+//int width = inDS.RasterXSize;
+//int height = inDS.RasterYSize;
+//int size = width * height;
+//}
+//Image img = new Image();
+
+var stream = await client.GetStreamAsync(url);
+var image = System.Drawing.Image.FromStream(stream);
+
+image.Save(@"C:\Users\Lewis\Desktop\ls2\test.png");
+
+
+//Image img = new System.Drawing.Image();
+
+
+//using (var response = await client.GetAsync(url))
+//{
+//    response.EnsureSuccessStatusCode();
+
+//    using (var inputStream = await response.Content.ReadAsInputStreamAsync())
+//    {
+//        bitmapImage.SetSource(inputStream.AsStreamForRead());
+//    }
+//}
+
+
+//var tif = @"C:\Users\Lewis\Desktop\ls1\2022-01-16.tif";
+
+//using (OSGeo.GDAL.Dataset inDS = OSGeo.GDAL.Gdal.Open(tif, OSGeo.GDAL.Access.GA_ReadOnly))
+//{
+//    // Get required dataset dimensions (all bands will be uniform)
+//    int width = inDS.RasterXSize;
+//    int height = inDS.RasterYSize;
+//    int size = width * height;
+
+//    var drv = OSGeo.GDAL.Gdal.GetDriverByName("NetCDF");
+
+//    // Setup translate options, perform translate to subset bands, export as GeoTiff
+//    OSGeo.GDAL.GDALTranslateOptions options = new OSGeo.GDAL.GDALTranslateOptions(
+//        new[] 
+//        { 
+//            "-of", "netCDF",
+
+
+//        });
+//    OSGeo.GDAL.Gdal.wrapper_GDALTranslate(@"C:\Users\Lewis\Desktop\gribs\2021-1-13.nc", inDS, options, null, null);
+
+
+//    int i = 0;
+
+
+//}
